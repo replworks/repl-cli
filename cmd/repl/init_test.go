@@ -7,8 +7,8 @@ import (
 
 func TestInitCommand(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Create the init command
 	cmd := newInitCmd()
@@ -34,8 +34,8 @@ func TestInitCommand(t *testing.T) {
 
 func TestInitCommandExecution(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Execute the init command
 	cmd := newInitCmd()
@@ -74,11 +74,11 @@ func TestInitCommandExecution(t *testing.T) {
 
 func TestInitCommandAlreadyInitialized(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Create .repl directory to simulate already initialized project
-	os.MkdirAll(".repl", 0755)
+	_ = os.MkdirAll(".repl", 0755)
 
 	// Execute the init command
 	cmd := newInitCmd()

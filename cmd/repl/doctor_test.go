@@ -8,8 +8,8 @@ import (
 
 func TestDoctorCommand(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Create the doctor command
 	cmd := newDoctorCmd()
@@ -35,8 +35,8 @@ func TestDoctorCommand(t *testing.T) {
 
 func TestDoctorCommandNotInitialized(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Execute the doctor command without initialization
 	cmd := newDoctorCmd()
@@ -55,16 +55,16 @@ func TestDoctorCommandNotInitialized(t *testing.T) {
 
 func TestDoctorCommandSuccess(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Initialize first
-	os.MkdirAll(".repl/runtime", 0755)
+	_ = os.MkdirAll(".repl/runtime", 0755)
 
 	// Create minimal required files
-	os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":false}`), 0644)
-	os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{}}`), 0644)
-	os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":[]}`), 0644)
+	_ = os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":false}`), 0644)
+	_ = os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{}}`), 0644)
+	_ = os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":[]}`), 0644)
 
 	// Execute the doctor command
 	cmd := newDoctorCmd()

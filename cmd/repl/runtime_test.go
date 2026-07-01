@@ -7,8 +7,8 @@ import (
 
 func TestRuntimeStartCommand(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Create the runtime start command
 	cmd := newRuntimeStartCmd()
@@ -34,8 +34,8 @@ func TestRuntimeStartCommand(t *testing.T) {
 
 func TestRuntimeStartCommandNotInitialized(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Execute the runtime start command without initialization
 	cmd := newRuntimeStartCmd()
@@ -49,14 +49,14 @@ func TestRuntimeStartCommandNotInitialized(t *testing.T) {
 
 func TestRuntimeStartCommandSuccess(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Initialize first
-	os.MkdirAll(".repl/runtime", 0755)
-	os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":false}`), 0644)
-	os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{}}`), 0644)
-	os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":[]}`), 0644)
+	_ = os.MkdirAll(".repl/runtime", 0755)
+	_ = os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":false}`), 0644)
+	_ = os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{}}`), 0644)
+	_ = os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":[]}`), 0644)
 
 	// Execute the runtime start command
 	cmd := newRuntimeStartCmd()
@@ -76,8 +76,8 @@ func TestRuntimeStartCommandSuccess(t *testing.T) {
 
 func TestRuntimeStopCommand(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Create the runtime stop command
 	cmd := newRuntimeStopCmd()
@@ -103,14 +103,14 @@ func TestRuntimeStopCommand(t *testing.T) {
 
 func TestRuntimeStopCommandSuccess(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Initialize first with active session
-	os.MkdirAll(".repl/runtime", 0755)
-	os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":true}`), 0644)
-	os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{}}`), 0644)
-	os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":[]}`), 0644)
+	_ = os.MkdirAll(".repl/runtime", 0755)
+	_ = os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":true}`), 0644)
+	_ = os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{}}`), 0644)
+	_ = os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":[]}`), 0644)
 
 	// Execute the runtime stop command
 	cmd := newRuntimeStopCmd()
@@ -130,8 +130,8 @@ func TestRuntimeStopCommandSuccess(t *testing.T) {
 
 func TestRuntimeStatusCommand(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Create the runtime status command
 	cmd := newRuntimeStatusCmd()
@@ -157,14 +157,14 @@ func TestRuntimeStatusCommand(t *testing.T) {
 
 func TestRuntimeStatusCommandSuccess(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Initialize first
-	os.MkdirAll(".repl/runtime", 0755)
-	os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":false}`), 0644)
-	os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{"TASK_1":{"status":"done"}}}`), 0644)
-	os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":["test log"]}`), 0644)
+	_ = os.MkdirAll(".repl/runtime", 0755)
+	_ = os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":false}`), 0644)
+	_ = os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{"TASK_1":{"status":"done"}}}`), 0644)
+	_ = os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":["test log"]}`), 0644)
 
 	// Execute the runtime status command
 	cmd := newRuntimeStatusCmd()

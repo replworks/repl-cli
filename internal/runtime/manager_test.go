@@ -7,8 +7,8 @@ import (
 
 func TestInit(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(ReplDir)
-	defer os.RemoveAll(ReplDir)
+	_ = os.RemoveAll(ReplDir)
+	defer func() { _ = os.RemoveAll(ReplDir) }()
 
 	// Test initialization
 	err := Init()
@@ -41,8 +41,8 @@ func TestInit(t *testing.T) {
 
 func TestExists(t *testing.T) {
 	// Clean up
-	os.RemoveAll(ReplDir)
-	defer os.RemoveAll(ReplDir)
+	_ = os.RemoveAll(ReplDir)
+	defer func() { _ = os.RemoveAll(ReplDir) }()
 
 	// Should not exist initially
 	if Exists() {
@@ -50,7 +50,7 @@ func TestExists(t *testing.T) {
 	}
 
 	// Create directory
-	os.MkdirAll(ReplDir, 0755)
+	_ = os.MkdirAll(ReplDir, 0755)
 
 	// Should exist now
 	if !Exists() {
@@ -60,8 +60,8 @@ func TestExists(t *testing.T) {
 
 func TestRuntimeExists(t *testing.T) {
 	// Clean up
-	os.RemoveAll(ReplDir)
-	defer os.RemoveAll(ReplDir)
+	_ = os.RemoveAll(ReplDir)
+	defer func() { _ = os.RemoveAll(ReplDir) }()
 
 	// Should not exist initially
 	if RuntimeExists() {
@@ -69,7 +69,7 @@ func TestRuntimeExists(t *testing.T) {
 	}
 
 	// Create directories
-	os.MkdirAll(RuntimeDir, 0755)
+	_ = os.MkdirAll(RuntimeDir, 0755)
 
 	// Should exist now
 	if !RuntimeExists() {
@@ -79,8 +79,8 @@ func TestRuntimeExists(t *testing.T) {
 
 func TestReadWriteState(t *testing.T) {
 	// Clean up
-	os.RemoveAll(ReplDir)
-	defer os.RemoveAll(ReplDir)
+	_ = os.RemoveAll(ReplDir)
+	defer func() { _ = os.RemoveAll(ReplDir) }()
 
 	// Initialize
 	if err := Init(); err != nil {
@@ -121,8 +121,8 @@ func TestReadWriteState(t *testing.T) {
 
 func TestReadWriteProgress(t *testing.T) {
 	// Clean up
-	os.RemoveAll(ReplDir)
-	defer os.RemoveAll(ReplDir)
+	_ = os.RemoveAll(ReplDir)
+	defer func() { _ = os.RemoveAll(ReplDir) }()
 
 	// Initialize
 	if err := Init(); err != nil {
@@ -167,8 +167,8 @@ func TestReadWriteProgress(t *testing.T) {
 
 func TestReadWriteLog(t *testing.T) {
 	// Clean up
-	os.RemoveAll(ReplDir)
-	defer os.RemoveAll(ReplDir)
+	_ = os.RemoveAll(ReplDir)
+	defer func() { _ = os.RemoveAll(ReplDir) }()
 
 	// Initialize
 	if err := Init(); err != nil {
@@ -208,8 +208,8 @@ func TestReadWriteLog(t *testing.T) {
 
 func TestAddLog(t *testing.T) {
 	// Clean up
-	os.RemoveAll(ReplDir)
-	defer os.RemoveAll(ReplDir)
+	_ = os.RemoveAll(ReplDir)
+	defer func() { _ = os.RemoveAll(ReplDir) }()
 
 	// Initialize
 	if err := Init(); err != nil {
@@ -246,8 +246,8 @@ func TestAddLog(t *testing.T) {
 
 func TestReset(t *testing.T) {
 	// Clean up
-	os.RemoveAll(ReplDir)
-	defer os.RemoveAll(ReplDir)
+	_ = os.RemoveAll(ReplDir)
+	defer func() { _ = os.RemoveAll(ReplDir) }()
 
 	// Initialize
 	if err := Init(); err != nil {
@@ -257,15 +257,15 @@ func TestReset(t *testing.T) {
 	// Modify state
 	state, _ := ReadState()
 	state.SessionActive = true
-	WriteState(state)
+	_ = WriteState(state)
 
 	progress, _ := ReadProgress()
 	progress.Tasks["TASK_1"] = TaskStatus{Status: "done"}
-	WriteProgress(progress)
+	_ = WriteProgress(progress)
 
 	log, _ := ReadLog()
 	log.Logs = []string{"test entry"}
-	WriteLog(log)
+	_ = WriteLog(log)
 
 	// Reset
 	if err := Reset(); err != nil {
@@ -303,8 +303,8 @@ func TestReset(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	// Clean up
-	os.RemoveAll(ReplDir)
-	defer os.RemoveAll(ReplDir)
+	_ = os.RemoveAll(ReplDir)
+	defer func() { _ = os.RemoveAll(ReplDir) }()
 
 	// Should fail when not initialized
 	if err := Validate(); err == nil {
@@ -322,7 +322,7 @@ func TestValidate(t *testing.T) {
 	}
 
 	// Corrupt state file
-	os.WriteFile(StateFile, []byte("invalid json"), 0644)
+	_ = os.WriteFile(StateFile, []byte("invalid json"), 0644)
 
 	// Should fail with corrupted state
 	if err := Validate(); err == nil {

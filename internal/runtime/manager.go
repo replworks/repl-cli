@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,42 +73,6 @@ func Init() error {
 	return nil
 }
 
-func copyTasksMD() error {
-	// Check if tasks.md already exists in .repl directory
-	dstPath := filepath.Join(ReplDir, "tasks.md")
-	if _, err := os.Stat(dstPath); err == nil {
-		// tasks.md already exists in .repl/, no need to copy
-		return nil
-	}
-
-	// Check if tasks.md exists in current directory
-	srcPath := "tasks.md"
-	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
-		// If tasks.md doesn't exist in current directory, nothing to copy
-		return nil
-	}
-
-	// Copy tasks.md to .repl/tasks.md
-	srcFile, err := os.Open(srcPath)
-	if err != nil {
-		return fmt.Errorf("failed to open source tasks.md: %w", err)
-	}
-	defer srcFile.Close()
-
-	dstFile, err := os.Create(dstPath)
-	if err != nil {
-		return fmt.Errorf("failed to create destination tasks.md: %w", err)
-	}
-	defer dstFile.Close()
-
-	_, err = io.Copy(dstFile, srcFile)
-	if err != nil {
-		return fmt.Errorf("failed to copy tasks.md: %w", err)
-	}
-
-	return nil
-}
-
 func loadTasksFromTasksMD() (TaskProgress, error) {
 	progress := TaskProgress{
 		Tasks: make(map[string]TaskStatus),
@@ -122,7 +85,9 @@ func loadTasksFromTasksMD() (TaskProgress, error) {
 		// If tasks.md doesn't exist, return empty progress
 		return progress, nil
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	// Parse tasks.md to extract task IDs
 	scanner := bufio.NewScanner(file)
@@ -143,7 +108,7 @@ func loadTasksFromTasksMD() (TaskProgress, error) {
 			if len(parts) >= 1 {
 				taskID := parts[0]
 				// Remove any trailing em-dash or dash
-				taskID = strings.TrimRight(taskID, "——-")
+				taskID = strings.TrimRight(taskID, "—")
 				taskID = strings.TrimSpace(taskID)
 				if taskID != "" {
 					progress.Tasks[taskID] = TaskStatus{Status: "pending"}
@@ -179,7 +144,9 @@ func writeJSON(path string, data interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
@@ -191,7 +158,9 @@ func ReadState() (*ExecutionState, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	var state ExecutionState
 	if err := json.NewDecoder(file).Decode(&state); err != nil {
@@ -210,7 +179,9 @@ func ReadProgress() (*TaskProgress, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	var progress TaskProgress
 	if err := json.NewDecoder(file).Decode(&progress); err != nil {
@@ -229,7 +200,9 @@ func ReadLog() (*ExecutionLog, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	var log ExecutionLog
 	if err := json.NewDecoder(file).Decode(&log); err != nil {

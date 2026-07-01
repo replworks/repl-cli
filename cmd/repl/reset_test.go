@@ -7,8 +7,8 @@ import (
 
 func TestResetCommand(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Create the reset command
 	cmd := newResetCmd()
@@ -34,8 +34,8 @@ func TestResetCommand(t *testing.T) {
 
 func TestResetCommandNotInitialized(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Execute the reset command without initialization
 	cmd := newResetCmd()
@@ -54,14 +54,14 @@ func TestResetCommandNotInitialized(t *testing.T) {
 
 func TestResetCommandSuccess(t *testing.T) {
 	// Clean up any existing .repl directory
-	os.RemoveAll(".repl")
-	defer os.RemoveAll(".repl")
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
 
 	// Initialize first
-	os.MkdirAll(".repl/runtime", 0755)
-	os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":true,"current_task":"TASK_1"}`), 0644)
-	os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{"TASK_1":{"status":"done"}}}`), 0644)
-	os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":["test log"]}`), 0644)
+	_ = os.MkdirAll(".repl/runtime", 0755)
+	_ = os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":true,"current_task":"TASK_1"}`), 0644)
+	_ = os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{"TASK_1":{"status":"done"}}}`), 0644)
+	_ = os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":["test log"]}`), 0644)
 
 	// Execute the reset command
 	cmd := newResetCmd()
