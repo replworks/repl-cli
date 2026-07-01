@@ -127,8 +127,9 @@ func runRuntimeStop() error {
 		return fmt.Errorf("no active runtime session to stop")
 	}
 
-	// Deactivate session
+	// Deactivate session and clear the active task
 	state.SessionActive = false
+	state.CurrentTask = ""
 	if err := rt.WriteState(state); err != nil {
 		return fmt.Errorf("failed to update execution state: %w", err)
 	}

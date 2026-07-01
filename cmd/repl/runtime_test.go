@@ -179,6 +179,30 @@ func TestRuntimeStatusCommandSuccess(t *testing.T) {
 	}
 }
 
+func TestRuntimeStopClearsCurrentTask(t *testing.T) {
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
+
+	_ = os.MkdirAll(".repl/runtime", 0755)
+	_ = os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":true,"current_task":"TASK_1"}`), 0644)
+	_ = os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{}}`), 0644)
+	_ = os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":[]}`), 0644)
+
+	err := runRuntimeStop()
+	if err != nil {
+		t.Fatalf("runRuntimeStop() failed: %v", err)
+	}
+
+	state, err := rt.ReadState()
+	if err != nil {
+		t.Fatalf("failed to read state: %v", err)
+	}
+
+	if state.CurrentTask != "" {
+		t.Fatalf("expected current task to be cleared after stop, got %q", state.CurrentTask)
+	}
+}
+
 func TestRuntimeApplyCommandUpdatesProgressAndCurrentTask(t *testing.T) {
 	_ = os.RemoveAll(".repl")
 	defer func() { _ = os.RemoveAll(".repl") }()
@@ -254,5 +278,69 @@ func TestRuntimeApplyCommandRequiresReasonForBlockedTasks(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "reason is required") {
 		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestRuntimeApplyCommandRejectsInvalidJSON(t *testing.T) {
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
+
+	_ = os.MkdirAll(".repl/runtime", 0755)
+	_ = os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":false}`), 0644)
+	_ = os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{}}`), 0644)
+	_ = os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":[]}`), 0644)
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stdin pipe: %v", err)
+	}
+	defer func() { _ = r.Close() }()
+
+	_, _ = w.WriteString(`{"action":"update_runtime","taskId":"TASK_3","status":}`)
+	_ = w.Close()
+
+	oldStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+
+	err = runRuntimeApply()
+	if err == nil {
+		t.Fatal("expected runRuntimeApply() to fail for invalid JSON")
+	}
+
+	if !strings.Contains(err.Error(), "invalid JSON input") {
+		t.Fatalf("expected invalid JSON error, got %v", err)
+	}
+}
+
+func TestRuntimeApplyCommandRejectsUnknownFields(t *testing.T) {
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
+
+	_ = os.MkdirAll(".repl/runtime", 0755)
+	_ = os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":false}`), 0644)
+	_ = os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{}}`), 0644)
+	_ = os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":[]}`), 0644)
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stdin pipe: %v", err)
+	}
+	defer func() { _ = r.Close() }()
+
+	_, _ = w.WriteString(`{"action":"update_runtime","taskId":"TASK_4","status":"done","unexpected":"value"}`)
+	_ = w.Close()
+
+	oldStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+
+	err = runRuntimeApply()
+	if err == nil {
+		t.Fatal("expected runRuntimeApply() to fail for unknown fields")
+	}
+
+	if !strings.Contains(err.Error(), "invalid JSON input") {
+		t.Fatalf("expected unknown field error, got %v", err)
 	}
 }
