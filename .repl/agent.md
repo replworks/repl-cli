@@ -48,6 +48,7 @@ AI is not responsible for:
 
 AI must:
 
+- CRITICAL: Never delete, modify, or tamper with any .md files under the .repl/ directory.
 - follow tasks.md exactly
 - follow product.md strictly
 - follow framework.md strictly
