@@ -24,4 +24,4 @@ lint-fix: ## automatically fix lint issues where possible
 check: fmt-check vet test
 
 build:
-	go build -o ai-issue ./cmd/ai-issue
+	go build -o repl ./cmd/repl
