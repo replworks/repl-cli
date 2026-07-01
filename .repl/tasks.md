@@ -1,4 +1,4 @@
-# TASKS.md
+# tasks.md
 
 # REPL CLI Execution Tasks (MVP)
 
@@ -13,7 +13,7 @@ Status: MVP
 - Each TASK corresponds to a single CLI command.
 - Each TASK must be independently executable.
 - Each TASK must be independently verifiable.
-- TASKS are executed in isolation.
+- Tasks are executed in isolation.
 - No TASK depends on partial completion of another TASK.
 
 ---

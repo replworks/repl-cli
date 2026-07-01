@@ -1,22 +1,5 @@
 # .repl/agent.md
 
-# REPL Agent Context (MVP)
-
----
-
-# Purpose
-
-This file provides execution context for AI inside REPL runtime.
-
-AI reads this file during:
-
-- `repl runtime start`
-- `repl runtime apply`
-
-AI is stateless and external to the system.
-
----
-
 # Context Loading Order
 
 AI must read files in this order:
@@ -33,7 +16,6 @@ AI must read files in this order:
 AI is only responsible for:
 
 - executing tasks
-- producing valid output for `repl runtime apply`
 
 AI is not responsible for:
 
@@ -48,6 +30,7 @@ AI is not responsible for:
 
 AI must:
 
+- CRITICAL: Never delete, modify, or tamper with any .md files under the .repl/ directory.
 - follow tasks.md exactly
 - follow product.md strictly
 - follow framework.md strictly
@@ -77,6 +60,30 @@ Optional fields:
 - events
 
 AI must not deviate from the schema defined in product.md.
+
+After completing or blocking any TASK, AI must produce a JSON payload that is directly compatible with `repl runtime apply` and must not output free-form text instead.
+
+Example success payload:
+
+```json
+{
+  "action": "update_runtime",
+  "taskId": "TASK_1",
+  "status": "done",
+  "events": ["step1", "step2"]
+}
+```
+
+Example blocked payload:
+
+```json
+{
+  "action": "update_runtime",
+  "taskId": "TASK_2",
+  "status": "blocked",
+  "reason": "dependency missing"
+}
+```
 
 ---
 

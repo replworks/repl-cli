@@ -106,7 +106,7 @@ repl runtime apply
 
     "taskId": {
       "type": "string",
-      "description": "Target TASK identifier matching TASKS.md (e.g., TASK_1)"
+      "description": "Target TASK identifier matching tasks.md (e.g., TASK_1)"
     },
 
     "status": {
@@ -171,7 +171,7 @@ REPL CLI does not persist any external or cloud state.
 ```text
 repl runtime start
     ↓
-Load TASKS.md
+Load tasks.md
     ↓
 Load .repl context
     ↓
