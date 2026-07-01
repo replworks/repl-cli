@@ -2,7 +2,10 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
+
+	rt "repl-cli/internal/runtime"
 )
 
 func TestRuntimeStartCommand(t *testing.T) {
@@ -173,5 +176,83 @@ func TestRuntimeStatusCommandSuccess(t *testing.T) {
 	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("Runtime status command failed: %v", err)
+	}
+}
+
+func TestRuntimeApplyCommandUpdatesProgressAndCurrentTask(t *testing.T) {
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
+
+	_ = os.MkdirAll(".repl/runtime", 0755)
+	_ = os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":false}`), 0644)
+	_ = os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{}}`), 0644)
+	_ = os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":[]}`), 0644)
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stdin pipe: %v", err)
+	}
+	defer func() { _ = r.Close() }()
+
+	_, _ = w.WriteString(`{"action":"update_runtime","taskId":"TASK_1","status":"done","events":["step-1"]}`)
+	_ = w.Close()
+
+	oldStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+
+	err = runRuntimeApply()
+	if err != nil {
+		t.Fatalf("runRuntimeApply() failed: %v", err)
+	}
+
+	progress, err := rt.ReadProgress()
+	if err != nil {
+		t.Fatalf("failed to read progress: %v", err)
+	}
+
+	if progress.Tasks["TASK_1"].Status != "done" {
+		t.Fatalf("expected TASK_1 status to be done, got %q", progress.Tasks["TASK_1"].Status)
+	}
+
+	state, err := rt.ReadState()
+	if err != nil {
+		t.Fatalf("failed to read state: %v", err)
+	}
+
+	if state.CurrentTask != "TASK_1" {
+		t.Fatalf("expected current task to be TASK_1, got %q", state.CurrentTask)
+	}
+}
+
+func TestRuntimeApplyCommandRequiresReasonForBlockedTasks(t *testing.T) {
+	_ = os.RemoveAll(".repl")
+	defer func() { _ = os.RemoveAll(".repl") }()
+
+	_ = os.MkdirAll(".repl/runtime", 0755)
+	_ = os.WriteFile(".repl/runtime/execution-state.json", []byte(`{"session_active":false}`), 0644)
+	_ = os.WriteFile(".repl/runtime/task-progress.json", []byte(`{"tasks":{}}`), 0644)
+	_ = os.WriteFile(".repl/runtime/execution-log.json", []byte(`{"logs":[]}`), 0644)
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stdin pipe: %v", err)
+	}
+	defer func() { _ = r.Close() }()
+
+	_, _ = w.WriteString(`{"action":"update_runtime","taskId":"TASK_2","status":"blocked"}`)
+	_ = w.Close()
+
+	oldStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+
+	err = runRuntimeApply()
+	if err == nil {
+		t.Fatal("expected runRuntimeApply() to fail when blocked tasks omit reason")
+	}
+
+	if !strings.Contains(err.Error(), "reason is required") {
+		t.Fatalf("expected validation error, got %v", err)
 	}
 }

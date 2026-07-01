@@ -204,6 +204,16 @@ func runRuntimeApply() error {
 		return fmt.Errorf("failed to update task progress: %w", err)
 	}
 
+	// Update execution state to reflect the applied task as current
+	state, err := rt.ReadState()
+	if err != nil {
+		return fmt.Errorf("failed to read execution state: %w", err)
+	}
+	state.CurrentTask = input.TaskID
+	if err := rt.WriteState(state); err != nil {
+		return fmt.Errorf("failed to update execution state: %w", err)
+	}
+
 	// Add log entries
 	logMessages := []string{
 		fmt.Sprintf("Runtime apply executed for task: %s", input.TaskID),
