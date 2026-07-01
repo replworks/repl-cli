@@ -99,7 +99,7 @@ repl init
 
 **Output:**
 
-```
+```bash
 REPL project initialized successfully
 Created: .repl/
 Created: .repl/runtime/
@@ -116,7 +116,7 @@ repl runtime start
 
 **Output:**
 
-```
+```bash
 Starting REPL runtime execution session...
 Runtime execution session activated
 System is ready for AI execution input
@@ -135,7 +135,7 @@ echo '{
 
 **Output:**
 
-```
+```bash
 Applying AI execution result...
 Task TASK_1 marked as: done
 Task completed successfully
@@ -149,7 +149,7 @@ repl runtime status
 
 **Output:**
 
-```
+```bash
 REPL Runtime Status
 ===================
 
@@ -179,7 +179,7 @@ repl runtime stop
 
 ## Architecture 🏗️
 
-```
+```bash
 User Command
     ↓
 REPL CLI (Cobra Layer)
@@ -202,7 +202,7 @@ All state is stored locally under `.repl/runtime/`:
 ```text
 repl runtime start
     ↓
-Load TASKS.md
+Load tasks.md
     ↓
 Load .repl context
     ↓
@@ -341,7 +341,7 @@ Same input → same output. No hidden state, no surprises.
 
 ### Project Structure
 
-```
+```text
 repl-cli/
 ├── cmd/
 │   └── repl/
