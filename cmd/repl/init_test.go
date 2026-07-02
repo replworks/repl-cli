@@ -33,9 +33,20 @@ func TestInitCommand(t *testing.T) {
 }
 
 func TestInitCommandExecution(t *testing.T) {
-	// Clean up any existing .repl directory
+	// Clean up any existing .repl directory and generated files
 	_ = os.RemoveAll(".repl")
-	defer func() { _ = os.RemoveAll(".repl") }()
+	_ = os.Remove("AGENTS.md")
+	defer func() {
+		_ = os.RemoveAll(".repl")
+		_ = os.Remove("AGENTS.md")
+		_ = os.RemoveAll("templates")
+	}()
+
+	// Set up template fixtures required by init
+	_ = os.MkdirAll("templates/.repl", 0755)
+	_ = os.WriteFile("templates/.repl/agent.md", []byte("# agent.md\n"), 0644)
+	_ = os.MkdirAll("templates", 0755)
+	_ = os.WriteFile("templates/AGENTS.md", []byte("# AGENTS.md\n\n## Rule\n\nread agent.md\n"), 0644)
 
 	// Execute the init command
 	cmd := newInitCmd()
@@ -70,7 +81,18 @@ func TestInitCommandExecution(t *testing.T) {
 	if _, err := os.Stat(".repl/runtime/execution-log.json"); os.IsNotExist(err) {
 		t.Error("Expected execution-log.json to be created")
 	}
+
+	// Verify .repl/agent.md was copied
+	if _, err := os.Stat(".repl/agent.md"); os.IsNotExist(err) {
+		t.Error("Expected .repl/agent.md to be created")
+	}
+
+	// Verify AGENTS.md was copied
+	if _, err := os.Stat("AGENTS.md"); os.IsNotExist(err) {
+		t.Error("Expected AGENTS.md to be created")
+	}
 }
+
 
 func TestInitCommandAlreadyInitialized(t *testing.T) {
 	// Clean up any existing .repl directory

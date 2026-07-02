@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -328,4 +329,135 @@ func TestValidate(t *testing.T) {
 	if err := Validate(); err == nil {
 		t.Error("Validate() should fail when state file is corrupted")
 	}
+}
+
+func TestCopyAgentMD(t *testing.T) {
+	// Set up a temp working dir so paths are isolated
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Chdir failed: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Create template source
+	_ = os.MkdirAll("templates/.repl", 0755)
+	_ = os.MkdirAll(".repl", 0755)
+	const agentContent = "# agent.md\n\ntest content\n"
+	_ = os.WriteFile("templates/.repl/agent.md", []byte(agentContent), 0644)
+
+	if err := CopyAgentMD(); err != nil {
+		t.Fatalf("CopyAgentMD() failed: %v", err)
+	}
+
+	got, err := os.ReadFile(".repl/agent.md")
+	if err != nil {
+		t.Fatalf("failed to read .repl/agent.md: %v", err)
+	}
+	if string(got) != agentContent {
+		t.Errorf("expected:\n%s\ngot:\n%s", agentContent, string(got))
+	}
+}
+
+func TestCopyAgentMD_MissingTemplate(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Chdir failed: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// No template file — should return error
+	if err := CopyAgentMD(); err == nil {
+		t.Error("CopyAgentMD() should fail when template is missing")
+	}
+}
+
+func TestCopyOrPrependAgentsMD_NoPrior(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Chdir failed: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Create template
+	_ = os.MkdirAll("templates", 0755)
+	const tmpl = "# AGENTS.md\n\n## Rule\n\nread agent.md\n"
+	_ = os.WriteFile("templates/AGENTS.md", []byte(tmpl), 0644)
+
+	prepended, err := CopyOrPrependAgentsMD()
+	if err != nil {
+		t.Fatalf("CopyOrPrependAgentsMD() failed: %v", err)
+	}
+	if prepended {
+		t.Error("prepended should be false when AGENTS.md did not exist")
+	}
+
+	got, err := os.ReadFile("AGENTS.md")
+	if err != nil {
+		t.Fatalf("failed to read AGENTS.md: %v", err)
+	}
+	if string(got) != tmpl {
+		t.Errorf("expected:\n%s\ngot:\n%s", tmpl, string(got))
+	}
+}
+
+func TestCopyOrPrependAgentsMD_Prepend(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Chdir failed: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Create template (heading will be stripped)
+	_ = os.MkdirAll("templates", 0755)
+	const tmpl = "# AGENTS.md\n\n## Rule\n\nread agent.md\n"
+	_ = os.WriteFile("templates/AGENTS.md", []byte(tmpl), 0644)
+
+	// Create existing AGENTS.md
+	const existing = "# My existing rules\n\nsome content\n"
+	_ = os.WriteFile("AGENTS.md", []byte(existing), 0644)
+
+	prepended, err := CopyOrPrependAgentsMD()
+	if err != nil {
+		t.Fatalf("CopyOrPrependAgentsMD() failed: %v", err)
+	}
+	if !prepended {
+		t.Error("prepended should be true when AGENTS.md already existed")
+	}
+
+	got, err := os.ReadFile("AGENTS.md")
+	if err != nil {
+		t.Fatalf("failed to read AGENTS.md: %v", err)
+	}
+
+	content := string(got)
+
+	// heading line must NOT appear
+	if contains(content, "# AGENTS.md") {
+		t.Error("heading '# AGENTS.md' must be stripped from prepended content")
+	}
+
+	// template body must appear before existing content
+	ruleIdx := indexOf(content, "## Rule")
+	existingIdx := indexOf(content, "# My existing rules")
+	if ruleIdx < 0 {
+		t.Error("template body '## Rule' not found in output")
+	}
+	if existingIdx < 0 {
+		t.Error("existing content not found in output")
+	}
+	if ruleIdx > existingIdx {
+		t.Error("template body should appear before existing content")
+	}
+}
+
+func contains(s, sub string) bool {
+	return strings.Contains(s, sub)
+}
+
+func indexOf(s, sub string) int {
+	return strings.Index(s, sub)
 }
