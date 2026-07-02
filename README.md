@@ -65,26 +65,25 @@ REPL CLI provides a **deterministic runtime controller** that:
 
 ---
 
-## Installation 📦
+## Installation
 
-### Prerequisites
-
-- Go >= 1.24
-
-### Install from Source
+### Homebrew (Recommended)
 
 ```bash
-git clone https://github.com/replworks/repl-cli.git
-cd repl-cli
-go build -o repl ./cmd/repl
-sudo mv repl /usr/local/bin/
+brew install replworks/tap/repl-cli
 ```
 
-### Verify Installation
+### Go
+
+```bash
+go install github.com/replworks/repl-cli/cmd/repl-cli@latest
+```
+
+Verify installation:
 
 ```bash
 repl --version
-# Output: repl version 0.1.0
+# Output: repl version 0.1.2
 ```
 
 ---
