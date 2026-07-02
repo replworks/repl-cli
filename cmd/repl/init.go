@@ -38,5 +38,22 @@ func runInit() error {
 	fmt.Println("Initialized: task-progress.json")
 	fmt.Println("Initialized: execution-log.json")
 
+	// Copy templates/.repl/agent.md → .repl/agent.md
+	if err := rt.CopyAgentMD(); err != nil {
+		return fmt.Errorf("failed to copy agent.md: %w", err)
+	}
+	fmt.Println("Copied: .repl/agent.md")
+
+	// Copy templates/AGENTS.md → AGENTS.md (prepend if already exists)
+	prepended, err := rt.CopyOrPrependAgentsMD()
+	if err != nil {
+		return fmt.Errorf("failed to copy AGENTS.md: %w", err)
+	}
+	if prepended {
+		fmt.Println("Prepended: AGENTS.md")
+	} else {
+		fmt.Println("Copied: AGENTS.md")
+	}
+
 	return nil
 }

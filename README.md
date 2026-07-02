@@ -106,7 +106,11 @@ Created: .repl/runtime/
 Initialized: execution-state.json
 Initialized: task-progress.json
 Initialized: execution-log.json
+Copied: .repl/agent.md
+Copied: AGENTS.md
 ```
+
+> If `AGENTS.md` already exists in the project root, the template content (excluding the `# AGENTS.md` heading) is **prepended** to the existing file instead of overwriting it.
 
 ### 2. Start Runtime Session
 
@@ -353,7 +357,12 @@ repl-cli/
 ├── internal/
 │   └── runtime/
 │       └── manager.go
+├── templates/
+│   ├── .repl/
+│   │   └── agent.md       ← copied to .repl/agent.md on init
+│   └── AGENTS.md          ← copied (or prepended) to AGENTS.md on init
 ├── .repl/
+│   ├── agent.md
 │   ├── product.md
 │   ├── framework.md
 │   ├── architecture.md

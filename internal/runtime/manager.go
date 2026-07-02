@@ -241,6 +241,74 @@ func Reset() error {
 	return Init()
 }
 
+// CopyAgentMD copies templates/.repl/agent.md to .repl/agent.md.
+func CopyAgentMD() error {
+	const src = "templates/.repl/agent.md"
+	const dst = ".repl/agent.md"
+
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return fmt.Errorf("failed to read template %s: %w", src, err)
+	}
+
+	if err := os.WriteFile(dst, data, 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", dst, err)
+	}
+
+	return nil
+}
+
+// CopyOrPrependAgentsMD copies templates/AGENTS.md to AGENTS.md.
+// If AGENTS.md already exists, the template content (excluding the first heading line)
+// is prepended to the existing file.
+func CopyOrPrependAgentsMD() (bool, error) {
+	const src = "templates/AGENTS.md"
+	const dst = "AGENTS.md"
+
+	templateData, err := os.ReadFile(src)
+	if err != nil {
+		return false, fmt.Errorf("failed to read template %s: %w", src, err)
+	}
+
+	// Check if AGENTS.md already exists
+	existingData, err := os.ReadFile(dst)
+	if err != nil && !os.IsNotExist(err) {
+		return false, fmt.Errorf("failed to read %s: %w", dst, err)
+	}
+
+	if os.IsNotExist(err) {
+		// File does not exist: plain copy
+		if err := os.WriteFile(dst, templateData, 0644); err != nil {
+			return false, fmt.Errorf("failed to write %s: %w", dst, err)
+		}
+		return false, nil
+	}
+
+	// File exists: strip the first heading line from the template, then prepend
+	templateLines := strings.Split(string(templateData), "\n")
+	var contentLines []string
+	for _, line := range templateLines {
+		if strings.HasPrefix(strings.TrimSpace(line), "# AGENTS") {
+			continue
+		}
+		contentLines = append(contentLines, line)
+	}
+
+	// Remove leading blank lines after heading removal
+	for len(contentLines) > 0 && strings.TrimSpace(contentLines[0]) == "" {
+		contentLines = contentLines[1:]
+	}
+
+	prependContent := strings.Join(contentLines, "\n")
+	merged := prependContent + "\n" + string(existingData)
+
+	if err := os.WriteFile(dst, []byte(merged), 0644); err != nil {
+		return false, fmt.Errorf("failed to write %s: %w", dst, err)
+	}
+
+	return true, nil
+}
+
 func Validate() error {
 	// Check if .repl directory exists
 	if !Exists() {
