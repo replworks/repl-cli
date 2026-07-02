@@ -57,4 +57,3 @@ func runInit() error {
 
 	return nil
 }
-

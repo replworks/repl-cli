@@ -93,7 +93,6 @@ func TestInitCommandExecution(t *testing.T) {
 	}
 }
 
-
 func TestInitCommandAlreadyInitialized(t *testing.T) {
 	// Clean up any existing .repl directory
 	_ = os.RemoveAll(".repl")
