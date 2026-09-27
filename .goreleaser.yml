@@ -42,12 +42,12 @@ homebrew_casks:
 
     homepage: "https://github.com/replworks/{{ .ProjectName }}"
     description: "A deterministic runtime controller for external AI-driven task execution."
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/repl-cli"]
-          end
+    custom_block: |
+      on_macos do
+        postflight_steps do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{" }}staged_path{{ "}}" }}/repl-cli"]
+        end
+      end
 
 checksum:
   name_template: "checksums.txt"
