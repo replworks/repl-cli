@@ -1,8 +1,11 @@
 # REPL CLI 🚀
 
-[![Go Version](https://img.shields.io/badge/Go-%3E%3D1.24-blue)](https://go.dev/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com)
+[![CI](https://github.com/replworks/repl-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/replworks/repl-cli/actions/workflows/ci.yml)
+[![release](https://github.com/replworks/repl-cli/actions/workflows/release.yml/badge.svg)](https://github.com/replworks/repl-cli/actions/workflows/release.yml)
+[![update-changelog](https://github.com/replworks/repl-cli/actions/workflows/update-changelog.yml/badge.svg)](https://github.com/replworks/repl-cli/actions/workflows/update-changelog.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/replworks/repl-cli.svg)](https://pkg.go.dev/github.com/replworks/repl-cli)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/replworks/repl-cli)](https://github.com/replworks/repl-cli)
+![License](https://img.shields.io/github/license/replworks/repl-cli)
 
 **A deterministic runtime controller for external AI-driven task execution**
 
@@ -45,15 +48,15 @@ REPL CLI provides a **deterministic runtime controller** that:
 
 ### 🎯 Core Commands
 
-| Command | Description |
-|---------|-------------|
-| `repl init` | Initialize REPL project runtime environment |
-| `repl doctor` | Validate system integrity and configuration |
-| `repl reset` | Reset runtime to clean initial state |
-| `repl runtime start` | Start execution session for AI input |
-| `repl runtime stop` | Stop execution session (no state mutation) |
-| `repl runtime apply` | Apply AI execution results (via JSON stdin) |
-| `repl runtime status` | Display current runtime state and progress |
+| Command               | Description                                 |
+| --------------------- | ------------------------------------------- |
+| `repl init`           | Initialize REPL project runtime environment |
+| `repl doctor`         | Validate system integrity and configuration |
+| `repl reset`          | Reset runtime to clean initial state        |
+| `repl runtime start`  | Start execution session for AI input        |
+| `repl runtime stop`   | Stop execution session (no state mutation)  |
+| `repl runtime apply`  | Apply AI execution results (via JSON stdin) |
+| `repl runtime status` | Display current runtime state and progress  |
 
 ### 🔒 Key Principles
 
