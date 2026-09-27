@@ -1,5 +1,14 @@
 # Release Notes
 
+## v0.1.3 - 2026-09-27
+
+### What's Changed
+
+* docs: update `installation` using `homebrew` in `README.md` by [@cable8mm](https://github.com/cable8mm) in https://github.com/replworks/repl-cli/pull/5
+* chore: update workflows and dependencies by [@cable8mm](https://github.com/cable8mm) in https://github.com/replworks/repl-cli/pull/6
+
+**Full Changelog**: https://github.com/replworks/repl-cli/compare/v0.1.2...v0.1.3
+
 ## v0.1.2 - 2026-07-02
 
 ### What's Changed
