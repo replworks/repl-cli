@@ -1,0 +1,226 @@
+# TASKS.md
+
+- [ ] T-001 Project foundation
+  - Satisfies: PRODUCT_SPEC.md § Purpose; § User Interface (Surface: command line)
+  - External boundary: no
+  - Acceptance criteria:
+    - Every constraint in TECH_STACK.md that can be satisfied before any product behavior exists is satisfied.
+    - Every verification command defined in TECH_STACK.md passes.
+    - The product builds and starts as a command-line program on the development platform.
+
+- [ ] T-002 Reject an unknown command or option
+  - Satisfies: PRODUCT_SPEC.md § Error Conditions (ERR-005); § Acceptance Criteria (AC-029, AC-030)
+  - External boundary: no
+  - Acceptance criteria:
+    - Given an unknown command, one error line is printed and the exit code is 2.
+    - Given an unknown option, one error line is printed and the exit code is 2.
+    - In both cases no file or directory in the project directory is created, modified, or deleted.
+    - In both cases no network request is sent (ARCHITECTURE.md § Failure Boundaries: unknown command or option).
+    - Unit tests for the Command Interface pass.
+
+- [ ] T-003 Report task progress with status
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / status (FR-008, FR-009, FR-010, FR-011, FR-012); § User Interface / Commands (EL-002); § Acceptance Criteria (AC-004, AC-005, AC-006)
+  - External boundary: no
+  - Acceptance criteria:
+    - Given a TASKS.md with 5 tasks of which 2 are complete, the output contains 2, 5, and the task ID of the first incomplete task in TASKS.md order, and the exit code is 0.
+    - Given a TASKS.md in which every task is complete, the output contains an indication that no incomplete task exists, and the exit code is 0.
+    - Given a TASKS.md with no task entries, the output contains 0 complete, 0 total, and the no-incomplete-task indication, and the exit code is 0.
+    - A checkbox marked with `x` or `X` counts as complete. A checkbox marked with a space counts as incomplete.
+    - Lines that do not match the Task Entry form defined for the Task Ledger Reader in ARCHITECTURE.md, and lines inside fenced code blocks, are not counted.
+    - After the command runs, no file or directory is created, modified, or deleted.
+    - Unit tests for the Document Line Classifier and the Task Ledger Reader pass.
+
+- [ ] T-004 Report an execution error from status when TASKS.md cannot be read
+  - Satisfies: PRODUCT_SPEC.md § Error Conditions (ERR-003); § Acceptance Criteria (AC-027); § User Interface / Commands (EL-002: exit 2 on execution error)
+  - External boundary: no
+  - Acceptance criteria:
+    - Given a project directory without TASKS.md, one error line is printed, the exit code is 2, and no file is created or modified.
+    - Given a TASKS.md whose read fails (simulated read failure), one error line is printed, the exit code is 2, and no file is created or modified.
+    - Unit tests for the Status Coordinator failure handling pass.
+
+- [ ] T-005 Create AGENTS.md and .replworks/ with init
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-001, FR-002, FR-004, FR-005, FR-007); § User Interface / Commands (EL-001); § Acceptance Criteria (AC-001, AC-003, AC-022)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live canonical source is observed: the Canonical Document Provider obtains exactly one canonical text from it.
+    - An E2E test exercises init through the live canonical source. Given an empty directory, AGENTS.md exists with content exactly equal to the canonical text obtained live, the `.replworks/` directory exists, and the exit code is 0.
+    - The output contains one line per created item, each containing the item path and identifying the item as created.
+    - No file or directory other than AGENTS.md and `.replworks/` exists afterward, and `.replworks/` contains nothing.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries (canonical text cannot be obtained or extracted) passes: when the canonical text cannot be obtained (simulated unreachable source), no file or directory is created, one error line is printed, and the exit code is 2. The same holds when the source contains no extractable canonical text.
+    - Unit tests for the Init Coordinator, the Canonical Document Provider, and the Project Workspace pass.
+
+- [ ] T-006 Skip existing items with init
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-003, FR-006, FR-007); § User Interface / Commands (EL-001); § Acceptance Criteria (AC-002)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live canonical source is observed as in T-005.
+    - An E2E test exercises init through the live canonical source. Given an existing AGENTS.md with arbitrary content, its content is unchanged byte for byte, the output contains the AGENTS.md path identified as skipped, and the exit code is 0.
+    - Given an existing `.replworks/` and no AGENTS.md, AGENTS.md is created and reported as created, `.replworks/` is reported as skipped, and the exit code is 0.
+    - Given both items existing, both are reported as skipped, nothing is modified, and the exit code is 0.
+    - Given an entry of any kind at an item's path, the item is treated as existing and skipped.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries (canonical text cannot be obtained or extracted) passes: given an existing AGENTS.md and an unobtainable canonical text, nothing is modified, one error line is printed, and the exit code is 2.
+    - Unit tests for the Init Coordinator skip logic pass.
+
+- [ ] T-007 Report a failed write from init as an execution error
+  - Satisfies: PRODUCT_SPEC.md § User Interface / Commands (EL-001: exit 2 on execution error); § Functional Requirements / init (FR-005)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live canonical source is observed as in T-005.
+    - An E2E test exercises init through the live canonical source, and its success case from T-005 still passes.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries (write fails, init) passes: given a simulated write failure while creating AGENTS.md, one error line is printed, the exit code is 2, and no further item is processed.
+    - Given AGENTS.md created and a simulated write failure while creating `.replworks/`, AGENTS.md remains and is reported as created, one error line is printed, and the exit code is 2.
+    - Unit tests for the Init Coordinator write-failure handling pass.
+
+- [ ] T-008 Report an up-to-date AGENTS.md with sync
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / sync (FR-027, FR-028, FR-031); § User Interface / Commands (EL-005); § Acceptance Criteria (AC-020, AC-023)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live canonical source is observed as in T-005.
+    - An E2E test exercises sync through the live canonical source. Given an AGENTS.md identical to the canonical text obtained live, the file is unmodified, the output contains the up-to-date indication, and the exit code is 0.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries (canonical text cannot be obtained or extracted) passes: given an unobtainable canonical text, AGENTS.md is unmodified, one error line is printed, and the exit code is 2.
+    - Unit tests for the Sync Coordinator comparison pass.
+
+- [ ] T-009 Show the difference and replace AGENTS.md with sync
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / sync (FR-029, FR-030, FR-031); § User Interface / Commands (EL-005); § Acceptance Criteria (AC-021)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live canonical source is observed as in T-005.
+    - An E2E test exercises sync through the live canonical source. Given an AGENTS.md that differs from the canonical text, the output contains the line-by-line difference, AGENTS.md afterward equals the canonical text exactly, and the exit code is 0.
+    - Given an AGENTS.md that differs only in line endings or trailing whitespace, the contents are treated as different, the difference is output, and AGENTS.md is replaced.
+    - Running sync again afterward outputs the up-to-date indication and the exit code is 0.
+    - The difference output for the same two texts is identical across runs.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: given an unobtainable canonical text, AGENTS.md is unmodified, one error line is printed, and the exit code is 2. Given a simulated replacement failure, the difference is still output, one error line is printed, and the exit code is 2.
+    - Unit tests for the Difference Calculator pass.
+
+- [ ] T-010 Report an execution error from sync when AGENTS.md cannot be read
+  - Satisfies: PRODUCT_SPEC.md § Error Conditions (ERR-004); § Acceptance Criteria (AC-028); § User Interface / Commands (EL-005: exit 2 on execution error)
+  - External boundary: no
+  - Acceptance criteria:
+    - Given a project directory without AGENTS.md, no file is created, one error line is printed, and the exit code is 2.
+    - In the same case no network request is sent.
+    - Given an AGENTS.md whose read fails (simulated read failure), no file is modified, one error line is printed, and the exit code is 2.
+    - Unit tests for the Sync Coordinator local-check handling pass.
+
+- [ ] T-011 Report missing authoritative documents with check
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-013, FR-018, FR-025); § User Interface / Commands (EL-003); § Acceptance Criteria (AC-007, AC-014)
+  - External boundary: no
+  - Acceptance criteria:
+    - Given a project directory without `.replworks/PRODUCT_SPEC.md`, one line reports rule documents-exist with the path of that file.
+    - Each missing authoritative document is reported on its own line containing the rule identifier, the file path relative to the project directory, and a message, in the document order defined for the Check Coordinator in ARCHITECTURE.md.
+    - A document that exists is not reported, including an empty document.
+    - Given at least one documents-exist violation and no execution error, the exit code is 1.
+    - After the command runs, no file or directory is created, modified, or deleted.
+    - Unit tests for the Check Coordinator and the Rule Evaluator (documents-exist) pass.
+
+- [ ] T-012 Report an AGENTS.md that differs from the canonical text with check
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-017, FR-018, FR-026); § Error Conditions (ERR-001); § Acceptance Criteria (AC-012, AC-024)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live canonical source is observed as in T-005.
+    - An E2E test exercises check through the live canonical source. Given an AGENTS.md that differs from the canonical text obtained live, one line reports rule agents-canonical with the path of AGENTS.md. Given an identical AGENTS.md, no such line appears.
+    - A difference only in line endings or trailing whitespace is reported as a violation.
+    - Given a project directory without AGENTS.md, rule agents-canonical is not evaluated and only documents-exist reports the absence.
+    - The canonical text is retrieved exactly once per check invocation.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries (canonical text cannot be obtained or extracted) passes: rule agents-canonical is not evaluated, one error line is printed, the other rules are still evaluated and reported, and the exit code is 2 even when violations exist.
+    - Unit tests for the Rule Evaluator (agents-canonical) pass.
+
+- [ ] T-013 Select and validate the base branch with check
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-020, FR-021); § Error Conditions (ERR-002); § User Interface / Commands (EL-003, EL-004); § Acceptance Criteria (AC-015, AC-016, AC-025, AC-026)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live repository behavior is observed with a real version-control repository: branch existence and the project directory's repository membership are determined correctly.
+    - An E2E test exercises check through a real repository. Given no `--base` option, the branch main is used: in a repository without main, one error line is printed and the exit code is 2.
+    - Given `--base dev` in a repository with dev, the branch dev is used and no base-branch error is printed.
+    - A project directory that is a subdirectory of a repository is accepted.
+    - Check does not change repository state: current branch, references, and working tree are identical before and after.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: given a directory that is not in a repository, rules documents-exist and agents-canonical are still evaluated, one error line is printed, and the exit code is 2. This also holds when TASKS.md is absent.
+    - Given a base branch that does not exist, one error line is printed, the exit code is 2, and no line reports task-ids-unchanged, single-task-completion, or no-unverified.
+    - Unit tests for the Base Branch Reader result handling pass.
+
+- [ ] T-014 Report removed task IDs with check
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-014, FR-022, FR-023); § User Interface / Commands (EL-003); § Acceptance Criteria (AC-008)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live repository behavior is observed with a real version-control repository: the TASKS.md content on the base branch is read at the same project-relative location as in the working tree.
+    - An E2E test exercises check through a real repository. Given a task ID that exists on the base branch and is absent in the working-tree TASKS.md, one line reports rule task-ids-unchanged with the path of TASKS.md and that task ID.
+    - Multiple removed IDs produce one line per distinct ID in base-branch order. IDs present in both produce no line.
+    - Given a TASKS.md that does not exist on the base branch, no task-ids-unchanged line appears.
+    - Given a project directory without TASKS.md, rule task-ids-unchanged is not evaluated and no line reports it.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: when the base ledger cannot be obtained (invalid repository or base branch), this rule is not evaluated.
+    - Unit tests for the Rule Evaluator (task-ids-unchanged) pass.
+
+- [ ] T-015 Report multiple newly complete tasks with check
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-015, FR-022, FR-023); § User Interface / Commands (EL-003); § Acceptance Criteria (AC-009, AC-017)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live repository behavior is observed as in T-014.
+    - An E2E test exercises check through a real repository. Given a working tree with two newly complete tasks, one line reports rule single-task-completion with the path of TASKS.md.
+    - Given one newly complete task or none, no such line appears.
+    - A task complete on the base branch and complete in the working tree is not newly complete. A task incomplete or absent on the base branch and complete in the working tree is newly complete.
+    - Given a TASKS.md that does not exist on the base branch, every complete task in the working tree is newly complete: two complete tasks produce the line, one produces none.
+    - Duplicate task IDs in the working tree are counted as separate entries.
+    - Given a project directory without TASKS.md, rule single-task-completion is not evaluated.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: when the base ledger cannot be obtained, this rule is not evaluated.
+    - Unit tests for the Rule Evaluator (newly complete derivation, single-task-completion) pass.
+
+- [ ] T-016 Report UNVERIFIED marks with check
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-016, FR-023); § User Interface / Commands (EL-003); § Acceptance Criteria (AC-010, AC-011, AC-018)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live repository behavior is observed as in T-014.
+    - An E2E test exercises check through a real repository. Given one newly complete task and one UNVERIFIED mark in a heading line of `.replworks/PRODUCT_SPEC.md`, `.replworks/TECH_STACK.md`, or `.replworks/ARCHITECTURE.md`, one line reports rule no-unverified with that document path and the line number of the mark.
+    - Given no newly complete task and one UNVERIFIED mark, no line reports no-unverified.
+    - Multiple marks produce one line each, ordered by document (PRODUCT_SPEC.md, TECH_STACK.md, ARCHITECTURE.md) and then by line number. Two marks in one heading line produce two lines.
+    - A mark outside a heading line, or inside a fenced code block, is not reported. A mark in AGENTS.md or TASKS.md is not reported.
+    - An absent document contributes no marks.
+    - Given a project directory without TASKS.md, no line reports task-ids-unchanged, single-task-completion, or no-unverified.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: when the base ledger cannot be obtained, this rule is not evaluated.
+    - Unit tests for the Unverified Mark Scanner and the Rule Evaluator (no-unverified) pass.
+
+- [ ] T-017 Report check execution errors from unreadable inputs
+  - Satisfies: PRODUCT_SPEC.md § User Interface / Commands (EL-003: one line per execution error, exit 2); § Functional Requirements / check (FR-026)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live canonical source and a real version-control repository are observed as in T-005 and T-014.
+    - An E2E test exercises check through both live boundaries, and a run with every input readable produces no execution error line.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: given an authoritative document whose read fails (simulated read failure), one error line identifies that document and the exit code is 2 even when violations exist.
+    - Given an unreadable TASKS.md, rules task-ids-unchanged, single-task-completion, and no-unverified are not evaluated.
+    - Given an unreadable AGENTS.md, rule agents-canonical is not evaluated.
+    - Given an unreadable document, documents-exist does not report it as missing, and rules that do not depend on it are still evaluated.
+    - An execution error line is printed for each unreadable input, whether or not a rule would have used it.
+    - Unit tests for the Check Coordinator error aggregation pass.
+
+- [ ] T-018 Complete check output, ordering, and exit codes
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-018, FR-019, FR-024, FR-025, FR-026); § User Interface / Commands (EL-003); § Acceptance Criteria (AC-013, AC-014, AC-019, AC-032)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live canonical source and a real version-control repository are observed as in T-005 and T-014.
+    - An E2E test exercises check through both live boundaries. Given a project that violates no rule, no violation line is printed and the exit code is 0.
+    - Given at least one violation and no execution error, the exit code is 1. Given at least one execution error, the exit code is 2.
+    - Violation lines are printed first, in rule order and in the order within each rule defined in ARCHITECTURE.md, followed by execution error lines in gathering order.
+    - Each violation is printed on its own line containing the rule identifier, the file path, and a message.
+    - After check or status runs, no file or directory is created, modified, or deleted, and the repository state is unchanged.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: with a violation and an execution error present together, both are printed and the exit code is 2.
+    - Unit tests for Command Interface rendering and exit-status mapping of check pass.
+
+- [ ] T-019 Confine every command to the project directory
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / all commands (FR-032, FR-034)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live canonical source and a real version-control repository are observed as in T-005 and T-014.
+    - An E2E test exercises init, status, check, and sync through the live boundaries. Files placed in the parent directory and in a sibling directory of the project directory are unchanged after each command.
+    - Only init and sync create, modify, or delete files within the project directory. After status, check, or an unknown command, the project directory is identical to its state before.
+    - Given a project directory that is a subdirectory of a repository, each command treats that subdirectory as the project directory.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: a path outside the project directory is rejected by the Project Workspace and no file outside is touched.
+    - Unit tests for the Project Workspace path confinement pass.
+
+- [ ] T-020 Limit network access to the canonical source
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / all commands (FR-033); § Acceptance Criteria (AC-031)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live canonical source is observed as in T-005.
+    - An E2E test runs init, status, check, and sync, and records every outbound network request made by each. The only address requested is the canonical source address.
+    - status, unknown commands, and sync without AGENTS.md send no network request.
+    - init, sync, and check each retrieve the canonical text at most once per invocation.
+    - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: when the canonical text cannot be obtained, no request to any other address is made as a fallback.
+    - Unit tests for the Canonical Document Provider request behavior pass.
