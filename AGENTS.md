@@ -194,8 +194,44 @@ For every task:
 8. If the task touches an EXTERNAL_BOUNDARY: write an E2E test against the live boundary. A mocked test alone does not satisfy this step. If the live boundary is unreachable, stop and report. Do not mark the task `[X]`.
 9. Run all tests
 10. Mark the completed task `[X]` in TASKS.md
-11. Stop
-    Do not start another task automatically.
+11. Deliver and continue (see AUTO_RUN)
+
+---
+
+## AUTO_RUN
+
+Repeat TASK_SELECTION and TASK_EXECUTION until no unchecked task remains.
+Do not stop between tasks. Do not ask for approval to start a task.
+
+Accounts, commit author, and co-author are given by the human in the bootstrap prompt.
+If they are missing, stop and ask.
+
+Per task:
+
+1. Pull main.
+2. Create branch `t-NNN-slug`.
+3. Implement and test (TASK_EXECUTION).
+4. Commit as the human account.
+5. Open a PR as the bot account. Reviewer: human account. Assignee: bot account.
+6. Squash merge only after every CI check on the PR has passed.
+   Pending is not passed. If no CI is configured, there is no gate.
+7. Pull main and start the next task.
+
+Never commit or merge directly to main.
+Commit messages and the PR title follow Conventional Commits.
+Merge message: use the one GitHub generates. Do not set a custom subject or body.
+
+Stop and ask the human only when:
+
+```text
+an UNVERIFIED gap needs a decision
+documents conflict
+a task is invalidated, or a spec/task/stack/architecture change is needed
+a live EXTERNAL_BOUNDARY is unreachable
+a task requires a Developer decision
+a manual or permission step is required
+tests or CI cannot be fixed
+```
 
 ---
 
@@ -279,6 +315,11 @@ Never regenerate TASKS.md from scratch.
 These rules bind the AI. The human may edit TASKS.md directly at any time.
 Human edits are authoritative.
 
+Exception: when the human explicitly requests task reordering that requires
+renumbering, the AI may approve and apply the renumbering after reviewing task
+dependencies, completion status, and references. Update every affected task ID
+reference in the same change; preserve each task's content and completion state.
+
 ---
 
 ## HUMAN_OWNED_CHANGES
@@ -303,7 +344,8 @@ When the human explicitly asks for such a change in the session:
    If the change would, stop (see PRODUCT_SPEC_CHANGES).
 3. Do not record the change in TASKS.md or any other document.
 4. Run the verification commands defined in TECH_STACK.md.
-5. Stop.
+5. Deliver it like a task (branch, PR, merge; see AUTO_RUN).
+6. Stop.
 
 Never make such changes on your own initiative.
 If a task needs content or styling and none is provided,
@@ -351,5 +393,6 @@ Task is complete only when:
 - code runs
 - unit tests pass
 - E2E tests pass for any EXTERNAL_BOUNDARY code touched
+- the PR is merged
 
-Then stop.
+Then continue with the next task.
