@@ -190,7 +190,7 @@
     - An execution error line is printed for each unreadable input, whether or not a rule would have used it.
     - Unit tests for the Check Coordinator error aggregation pass.
 
-- [ ] T-018 Complete check output, ordering, and exit codes
+- [X] T-018 Complete check output, ordering, and exit codes
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-018, FR-019, FR-024, FR-025, FR-026); § User Interface / Commands (EL-003); § Acceptance Criteria (AC-013, AC-014, AC-019, AC-032)
   - External boundary: yes
   - Acceptance criteria:

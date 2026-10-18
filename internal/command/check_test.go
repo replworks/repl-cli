@@ -182,6 +182,35 @@ func TestRenderCheck(t *testing.T) {
 			wantCode:   2,
 			wantStdout: "repl: reading AGENTS.md: permission denied\n",
 		},
+		{
+			name: "every rule in order before every error",
+			outcome: checkproject.Outcome{
+				Violations: []rule.Violation{
+					{Rule: rule.RuleDocumentsExist, Path: ".replworks/TECH_STACK.md", Message: "document does not exist"},
+					{Rule: rule.RuleTaskIDsUnchanged, Path: ".replworks/TASKS.md", Message: "missing task ID T-003"},
+					{Rule: rule.RuleTaskIDsUnchanged, Path: ".replworks/TASKS.md", Message: "missing task ID T-004"},
+					{Rule: rule.RuleSingleTaskCompletion, Path: ".replworks/TASKS.md", Message: "2 tasks are newly complete"},
+					{Rule: rule.RuleNoUnverified, Path: ".replworks/PRODUCT_SPEC.md", Message: "UNVERIFIED mark on line 1"},
+					{Rule: rule.RuleNoUnverified, Path: ".replworks/ARCHITECTURE.md", Message: "UNVERIFIED mark on line 2"},
+					{Rule: rule.RuleAgentsCanonical, Path: "AGENTS.md", Message: "AGENTS.md differs from the canonical AGENTS.md"},
+				},
+				Errors: []error{
+					errors.New("reading .replworks/TASKS.md: permission denied"),
+					errors.New("the base branch release does not exist in the repository"),
+				},
+			},
+			wantCode: 2,
+			wantStdout: "" +
+				"documents-exist .replworks/TECH_STACK.md: document does not exist\n" +
+				"task-ids-unchanged .replworks/TASKS.md: missing task ID T-003\n" +
+				"task-ids-unchanged .replworks/TASKS.md: missing task ID T-004\n" +
+				"single-task-completion .replworks/TASKS.md: 2 tasks are newly complete\n" +
+				"no-unverified .replworks/PRODUCT_SPEC.md: UNVERIFIED mark on line 1\n" +
+				"no-unverified .replworks/ARCHITECTURE.md: UNVERIFIED mark on line 2\n" +
+				"agents-canonical AGENTS.md: AGENTS.md differs from the canonical AGENTS.md\n" +
+				"repl: reading .replworks/TASKS.md: permission denied\n" +
+				"repl: the base branch release does not exist in the repository\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1025,5 +1054,59 @@ func TestCheckKeepsEvaluatedRulesWhenADocumentIsUnreadable(t *testing.T) {
 	}
 	if strings.Contains(stdout, "agents-canonical") {
 		t.Fatalf("stdout = %q, want no agents-canonical line for an unreadable AGENTS.md", stdout)
+	}
+}
+
+func TestCheckPrintsViolationsInRuleOrderBeforeErrors(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, "# stale\n")
+	writeTasks(t, dir, "- [ ] T-001 first\n- [ ] T-002 second\n- [ ] T-003 third\n")
+	initRepository(t, dir)
+	writeTasks(t, dir, "- [x] T-001 first\n- [x] T-002 second\n")
+	writeDocument(t, dir, filepath.Join(".replworks", "PRODUCT_SPEC.md"), "# PRODUCT_SPEC.md\n## 1. Purpose [UNVERIFIED]\n")
+	if err := os.Remove(filepath.Join(dir, ".replworks", "TECH_STACK.md")); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	agents := filepath.Join(dir, "AGENTS.md")
+	if err := os.Remove(agents); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.Mkdir(agents, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{
+		"documents-exist .replworks/TECH_STACK.md: document does not exist",
+		"task-ids-unchanged .replworks/TASKS.md: missing task ID T-003",
+		"single-task-completion .replworks/TASKS.md: 2 tasks are newly complete",
+		"no-unverified .replworks/PRODUCT_SPEC.md: UNVERIFIED mark on line 2",
+	}
+	if len(lines) != len(want)+1 {
+		t.Fatalf("stdout = %q, want the violations followed by one error line", stdout)
+	}
+	for i, line := range want {
+		if lines[i] != line {
+			t.Fatalf("line %d = %q, want %q", i+1, lines[i], line)
+		}
+	}
+	if last := lines[len(lines)-1]; !strings.HasPrefix(last, "repl: reading AGENTS.md: ") {
+		t.Fatalf("last line = %q, want the AGENTS.md error", last)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
 	}
 }
