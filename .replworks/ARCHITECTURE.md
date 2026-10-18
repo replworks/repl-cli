@@ -66,10 +66,11 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
   - Recognize the command and its options.
   - Reject an unknown command or option before any coordinator runs.
   - Resolve the base branch name for check (the given value, otherwise the default defined in PRODUCT_SPEC.md).
+  - For init, prompt for and validate the selected published AGENTS.md document.
   - Produce assistance output (usage help and similar) itself, without a coordinator.
   - Render each Outcome into output lines.
   - Map each Outcome to an exit status.
-- Inputs: command-line arguments.
+- Inputs: command-line arguments and, for init, the user's document selection.
 - Outputs: output lines, exit status, one Request to one Coordinator.
 - Ownership boundaries:
   - Owns all printed text, line layout, line order, and the exit status.
@@ -78,13 +79,13 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
 ### C2. Init Coordinator
 
 - Responsibilities:
-  - Obtain the Canonical Text first.
+  - Obtain the Canonical Text for the selected init document first.
   - Make no write when the Canonical Text is `Failed`.
   - Process items in this order: AGENTS.md, then the `.replworks/` directory.
   - Mark an item `skipped` when it is present. Otherwise create it (AGENTS.md with the Canonical Text, the directory empty).
   - Create nothing else.
   - Stop at the first write failure.
-- Inputs: Request (no options), Canonical Text fact, Workspace presence facts.
+- Inputs: Request with the selected document source, Canonical Text fact, Workspace presence facts.
 - Outputs: Outcome with one `(item path, created | skipped)` entry per processed item, and execution errors.
 - Ownership boundaries:
   - Owns the item order and the created/skipped decision.
@@ -158,12 +159,12 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
 ### C7. Canonical Document Provider
 
 - Responsibilities:
-  - Obtain the Canonical Text from the single published source.
+  - Obtain the Canonical Text from the source selected by the request. The allowed sources are the two published Markdown documents in PRODUCT_SPEC.md.
   - Return the Canonical Text exactly as the canonical content, with no normalization.
   - Retrieve at most once per invocation. Later requests in the same invocation reuse the first result, including a failure.
-  - Treat these as `Failed`: source unreachable, unsuccessful response, or no single canonical text can be extracted from the source.
+  - Treat these as `Failed`: source unreachable, unsuccessful response, or an empty response from the source.
   - Keep the source's representation private. Other components never see it.
-- Inputs: none (the source address is fixed by PRODUCT_SPEC.md).
+- Inputs: a source selection. Init supplies the user's selection; commands without a selection use PRODUCT_SPEC.md's default canonical document.
 - Outputs: `Present(Canonical Text) | Failed(reason)`.
 - Ownership boundaries:
   - Owns all network access and the extraction of the Canonical Text.
@@ -317,7 +318,8 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
 
 ```text
 Request → Init Coordinator
-  Canonical Document Provider → Canonical Text fact
+  Command Interface → validated document selection
+  Canonical Document Provider(selection) → Canonical Text fact
   [Failed] → Outcome(error), no write
   [Present] → Workspace presence(AGENTS.md), presence(.replworks/)
              → Workspace Write: create absent items
@@ -397,6 +399,7 @@ Request → Sync Coordinator
 | Failure                                                       | Detected by                                 | Contained by       | Effect                                                                                                                  |
 | ------------------------------------------------------------- | ------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Unknown command or option                                     | Command Interface                           | Command Interface  | Error line, no coordinator runs, no file touched                                                                        |
+| Init input ends or fails before a valid document selection   | Command Interface                           | Command Interface  | Error line, exit 2, no coordinator runs, no file touched                                                               |
 | Canonical Text cannot be obtained or extracted                | Canonical Document Provider                 | Coordinator in use | init and sync: stop, no write. check: agents-canonical not evaluated, other rules still run                             |
 | Project Directory not in a repository, or base branch missing | Base Branch Reader                          | Check Coordinator  | task-ids-unchanged, single-task-completion, no-unverified not evaluated. documents-exist and agents-canonical still run |
 | TASKS.md absent in working tree (check)                       | Project Workspace                           | Check Coordinator  | Not an error. The three ledger-dependent rules are not evaluated                                                        |
@@ -421,7 +424,7 @@ Request → Sync Coordinator
 - No rollback or transaction across multiple writes.
 - No automatic repair of rule violations by check.
 - No resolution or ranking of conflicts between documents.
-- No interactive prompting during an invocation.
+- No interactive prompting during an invocation except the required document selection for init.
 - No pluggable output renderers or alternative output encodings.
 
 ## 11. Architectural Invariants
@@ -432,7 +435,7 @@ Request → Sync Coordinator
 - Every repository access is performed by the Base Branch Reader and is read-only.
 - Every printed line and every exit status is produced by the Command Interface.
 - Every violation is produced by the Rule Evaluator from facts, and every execution error from a `Failed` fact or failed write.
-- The Canonical Text used within one invocation is always one single retrieved result.
+- The Canonical Text used within one invocation is always one single retrieved result from the selected or default source.
 - Rule evaluation order and output order are always the fixed orders defined here.
 - Task Entry and Mark recognition always follow the single shared line and fence definition.
 - No component retains information between invocations.
@@ -446,8 +449,8 @@ Each entry: ambiguity → decision → why.
 - RD-03: The grammar of a Task Entry is undefined → exact checkbox list line form defined in C10; `x` and `X` mean complete; anything else is not an entry; lines inside fenced blocks are not entries → confirmed by the user, with the fence exclusion following the same rule used for headings.
 - RD-04: Duplicate task IDs and "absent or incomplete on base" are ambiguous → entries are counted individually, and an ID is complete in base when any base entry with that ID is complete; task-ids-unchanged compares distinct IDs → keeps counts per entry (status totals) while keeping ID identity stable across branches.
 - RD-05: Whether agents-canonical normalizes content is undefined → exact comparison with no normalization, also used by sync → confirmed by the user; matches "identical" in sync.
-- RD-06: The canonical source's representation is not defined by this architecture → the Canonical Document Provider hides it entirely, and "cannot be obtained" includes failure to extract one canonical text → the user will deliver the source in a different form later without any other component changing.
-- RD-07: When the canonical text is retrieved is undefined → exactly once per invocation, and always attempted by init, sync (after the local check), and check → ERR-001 requires an error line from check in every case where retrieval fails, so retrieval cannot be skipped.
+- RD-06: The canonical source's representation is not defined by this architecture → the Canonical Document Provider hides the response representation and returns the exact response text; "cannot be obtained" includes an unsuccessful response or unavailable response → source-specific representation handling stays inside the provider.
+- RD-07: When the canonical text is retrieved is undefined → exactly once per invocation, using init's validated selection or the default document for sync and check, and always attempted by init, sync (after the local check), and check → ERR-001 requires an error line from check in every case where retrieval fails, so retrieval cannot be skipped.
 - RD-08: init may meet an existing AGENTS.md while the canonical text is unobtainable → init obtains the Canonical Text first and writes nothing on failure, even when AGENTS.md already exists → ERR-001 applies unconditionally to init.
 - RD-09: sync with both an absent AGENTS.md and an unobtainable canonical source would produce two errors → the local check runs first and stops, so exactly one error line is produced and no network access is spent → keeps ERR-004 and ERR-001 each satisfied with one error line.
 - RD-10: Repository validity in check is only tied to TASKS.md → check always verifies repository and base branch validity, even when TASKS.md is absent in the working tree → confirmed by the user; ERR-002 is unconditional.
@@ -461,5 +464,5 @@ Each entry: ambiguity → decision → why.
 - RD-18: Presence semantics for init are undefined when the path exists with another entry kind → presence is existence of an entry at the path, regardless of kind, and the item is skipped → FR-003 forbids modifying anything that exists.
 - RD-19: Write failures during init are not covered → stop at the first failure, no rollback, items created before it are still reported as created, plus an execution error → keeps the output truthful about the file system.
 - RD-20: Sync prints the difference and replaces the file, but the order is undefined → the difference is computed before replacement and rendered after the Outcome is returned; if replacement fails, the difference is still shown with the error → the user always sees what would have changed.
-- RD-21: FR-032 (project directory only) and FR-033 (single network address) versus the External Systems list → access to the version-control repository and the canonical source is allowed only through C8 and C7 respectively; every other access goes through C6 and is confined to the Project Directory → keeps all external access in single named owners.
+- RD-21: FR-032 (project directory only) and FR-033 (two allowed network addresses) versus the External Systems list → access to the version-control repository and either published document is allowed only through C8 and C7 respectively; every other access goes through C6 and is confined to the Project Directory → keeps all external access in single named owners.
 - RD-22: Usage help and similar interface-level assistance are not listed in PRODUCT_SPEC.md → the Command Interface produces them itself, they touch no other component, and they perform no read, write, or network access → they are not use cases; PRODUCT_SPEC.md still needs a later update to list them, since ERR-005 does not mention them.

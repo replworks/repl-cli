@@ -2,27 +2,29 @@
 package canon
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/net/html"
 
 	"github.com/replworks/repl-cli/internal/fact"
 )
 
-// SourceURL is the only network resource the program may access.
-const SourceURL = "https://www.repl.net/documents/agents/"
+// Document identifies one of the published AGENTS.md documents.
+type Document string
+
+const (
+	AgentsDocument     Document = "https://www.repl.net/documents/agents.md"
+	AgentsAutoDocument Document = "https://www.repl.net/documents/agents-auto.md"
+	// SourceURL is the default document used by commands without a selection.
+	SourceURL = string(AgentsDocument)
+)
 
 const (
 	requestTimeout = 30 * time.Second
 	maxPageSize    = 8 << 20
-	separator      = "\x7f"
 )
 
 // Provider retrieves and caches the canonical AGENTS.md.
@@ -34,14 +36,20 @@ type Provider struct {
 	canonical fact.Fact[string]
 }
 
-// New returns a Provider reading from SourceURL. A nil client uses a default
-// client with a timeout.
+// New returns a Provider reading the default document. A nil client uses a
+// default client with a timeout.
 func New(client *http.Client) *Provider {
+	return NewForDocument(client, AgentsDocument)
+}
+
+// NewForDocument returns a Provider reading document. A nil client uses a
+// default client with a timeout.
+func NewForDocument(client *http.Client, document Document) *Provider {
 	if client == nil {
 		client = &http.Client{Timeout: requestTimeout}
 	}
 
-	return &Provider{client: client, url: SourceURL}
+	return &Provider{client: client, url: string(document)}
 }
 
 // Canonical returns the canonical AGENTS.md. The source is contacted at most
@@ -60,12 +68,11 @@ func (p *Provider) retrieve() fact.Fact[string] {
 		return fact.Failed[string](err)
 	}
 
-	text, err := extract(page)
-	if err != nil {
-		return fact.Failed[string](err)
+	if len(page) == 0 {
+		return fact.Failed[string](fmt.Errorf("reading %s: response is empty", p.url))
 	}
 
-	return fact.Present(text)
+	return fact.Present(string(page))
 }
 
 func (p *Provider) fetch() ([]byte, error) {
@@ -99,34 +106,4 @@ func (p *Provider) fetch() ([]byte, error) {
 	}
 
 	return page, nil
-}
-
-func extract(page []byte) (string, error) {
-	document, err := html.Parse(bytes.NewReader(page))
-	if err != nil {
-		return "", fmt.Errorf("parsing %s: %w", SourceURL, err)
-	}
-
-	var texts []string
-
-	var visit func(node *html.Node)
-	visit = func(node *html.Node) {
-		if node.Type == html.ElementNode {
-			for _, attribute := range node.Attr {
-				if attribute.Key == "data-code" {
-					texts = append(texts, attribute.Val)
-				}
-			}
-		}
-		for child := node.FirstChild; child != nil; child = child.NextSibling {
-			visit(child)
-		}
-	}
-	visit(document)
-
-	if len(texts) != 1 {
-		return "", fmt.Errorf("%s holds %d canonical texts, want 1", SourceURL, len(texts))
-	}
-
-	return strings.ReplaceAll(texts[0], separator, "\n"), nil
 }

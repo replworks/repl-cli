@@ -16,6 +16,7 @@ type App struct {
 	Version    string
 	Commit     string
 	Date       string
+	Stdin      io.Reader
 	Stdout     io.Writer
 	Stderr     io.Writer
 	HTTPClient *http.Client
@@ -40,9 +41,13 @@ type runner struct {
 	canonicalSource *canon.Provider
 }
 
-func (r *runner) canonical() *canon.Provider {
+func (r *runner) canonical(documents ...canon.Document) *canon.Provider {
 	if r.canonicalSource == nil {
-		r.canonicalSource = canon.New(r.app.HTTPClient)
+		document := canon.AgentsDocument
+		if len(documents) > 0 {
+			document = documents[0]
+		}
+		r.canonicalSource = canon.NewForDocument(r.app.HTTPClient, document)
 	}
 
 	return r.canonicalSource
@@ -66,6 +71,9 @@ func (r *runner) newRootCommand() *cobra.Command {
 	}
 	root.SetOut(r.app.Stdout)
 	root.SetErr(r.app.Stderr)
+	if r.app.Stdin != nil {
+		root.SetIn(r.app.Stdin)
+	}
 	root.AddCommand(r.newStatusCommand())
 	root.AddCommand(r.newInitCommand())
 	root.AddCommand(r.newSyncCommand())
