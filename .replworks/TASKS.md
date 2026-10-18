@@ -61,7 +61,7 @@
     - Failure behavior from ARCHITECTURE.md § Failure Boundaries (canonical text cannot be obtained or extracted) passes: given an existing AGENTS.md and an unobtainable canonical text, nothing is modified, one error line is printed, and the exit code is 2.
     - Unit tests for the Init Coordinator skip logic pass.
 
-- [ ] T-007 Report a failed write from init as an execution error
+- [X] T-007 Report a failed write from init as an execution error
   - Satisfies: PRODUCT_SPEC.md § User Interface / Commands (EL-001: exit 2 on execution error); § Functional Requirements / init (FR-005)
   - External boundary: yes
   - Acceptance criteria:

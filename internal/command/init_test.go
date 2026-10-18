@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,10 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/spf13/cobra"
+
+	"github.com/replworks/repl-cli/internal/initproject"
 )
 
 // recordedTestdata holds the page and the canonical text observed live from
@@ -316,6 +321,74 @@ func TestInitSkipsEntriesOfAnyKind(t *testing.T) {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout = %q, want it to contain %q", stdout, want)
 		}
+	}
+}
+
+func renderInitOutcome(t *testing.T, outcome initproject.Outcome) (int, string) {
+	t.Helper()
+
+	var buffer bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&buffer)
+
+	return renderInit(cmd, outcome), buffer.String()
+}
+
+func TestRenderInit(t *testing.T) {
+	tests := []struct {
+		name       string
+		outcome    initproject.Outcome
+		wantCode   int
+		wantStdout string
+	}{
+		{
+			name: "created items",
+			outcome: initproject.Outcome{Items: []initproject.Item{
+				{Path: "AGENTS.md", Created: true},
+				{Path: ".replworks", Created: true},
+			}},
+			wantCode:   0,
+			wantStdout: "created: AGENTS.md\ncreated: .replworks\n",
+		},
+		{
+			name: "skipped items",
+			outcome: initproject.Outcome{Items: []initproject.Item{
+				{Path: "AGENTS.md"},
+				{Path: ".replworks"},
+			}},
+			wantCode:   0,
+			wantStdout: "skipped: AGENTS.md\nskipped: .replworks\n",
+		},
+		{
+			name: "a created item followed by an execution error",
+			outcome: initproject.Outcome{
+				Items:  []initproject.Item{{Path: "AGENTS.md", Created: true}},
+				Errors: []error{errors.New("permission denied")},
+			},
+			wantCode:   2,
+			wantStdout: "created: AGENTS.md\nrepl: permission denied\n",
+		},
+		{
+			name: "an execution error before any item",
+			outcome: initproject.Outcome{
+				Errors: []error{errors.New("the canonical AGENTS.md is unreachable")},
+			},
+			wantCode:   2,
+			wantStdout: "repl: the canonical AGENTS.md is unreachable\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, stdout := renderInitOutcome(t, tt.outcome)
+
+			if code != tt.wantCode {
+				t.Fatalf("exit code = %d, want %d", code, tt.wantCode)
+			}
+			if stdout != tt.wantStdout {
+				t.Fatalf("stdout = %q, want %q", stdout, tt.wantStdout)
+			}
+		})
 	}
 }
 

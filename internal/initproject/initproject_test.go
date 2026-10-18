@@ -213,6 +213,32 @@ func TestRunStopsAtTheFirstWriteFailure(t *testing.T) {
 	}
 }
 
+func TestRunReportsTheCreatedItemWhenTheSecondWriteFails(t *testing.T) {
+	failure := errors.New("permission denied")
+	writer := newFakeWriter()
+	writer.createDirErr = failure
+
+	outcome := Coordinator{Source: newSource(), Workspace: writer}.Run()
+
+	if len(outcome.Errors) != 1 || !errors.Is(outcome.Errors[0], failure) {
+		t.Fatalf("errors = %v, want the write failure", outcome.Errors)
+	}
+	if got := writer.files["AGENTS.md"]; got != canonicalText {
+		t.Fatalf("AGENTS.md content = %q, want the canonical text", got)
+	}
+	if writer.dirs[".replworks"] {
+		t.Fatal(".replworks was created although the write failed")
+	}
+	wantItems := []Item{{Path: "AGENTS.md", Created: true}}
+	if len(outcome.Items) != len(wantItems) || outcome.Items[0] != wantItems[0] {
+		t.Fatalf("items = %+v, want %+v", outcome.Items, wantItems)
+	}
+	wantTrace := "exists AGENTS.md, create-file AGENTS.md, exists .replworks, create-directory .replworks"
+	if got := writer.trace(); got != wantTrace {
+		t.Fatalf("trace = %q, want %q", got, wantTrace)
+	}
+}
+
 func TestRunStopsWhenPresenceCannotBeDetermined(t *testing.T) {
 	failure := errors.New("listing failed")
 	writer := newFakeWriter()
