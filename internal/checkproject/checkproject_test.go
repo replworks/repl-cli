@@ -348,3 +348,52 @@ func TestRunDoesNotReportTaskIDsWhenTheBaseBranchFails(t *testing.T) {
 		t.Fatalf("errors = %v, want the base branch failure", outcome.Errors)
 	}
 }
+
+func TestRunReportsMoreThanOneNewlyCompleteTask(t *testing.T) {
+	coord, _ := coordinator(presentDocuments("# AGENTS.md\n", "- [x] T-001 first\n- [x] T-002 second\n"))
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [ ] T-001 first\n- [ ] T-002 second\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	want := []rule.Violation{
+		{Rule: rule.RuleSingleTaskCompletion, Path: tasksPath, Message: "2 tasks are newly complete"},
+	}
+	if !reflect.DeepEqual(outcome.Violations, want) {
+		t.Fatalf("violations = %v, want %v", outcome.Violations, want)
+	}
+	if len(outcome.Errors) != 0 {
+		t.Fatalf("errors = %v, want none", outcome.Errors)
+	}
+}
+
+func TestRunCountsEveryCompleteTaskWhenTheBaseHasNoTasks(t *testing.T) {
+	coord, _ := coordinator(presentDocuments("# AGENTS.md\n", "- [x] T-001 first\n- [x] T-002 second\n"))
+
+	outcome := coord.Run(baseBranch)
+
+	want := []rule.Violation{
+		{Rule: rule.RuleSingleTaskCompletion, Path: tasksPath, Message: "2 tasks are newly complete"},
+	}
+	if !reflect.DeepEqual(outcome.Violations, want) {
+		t.Fatalf("violations = %v, want %v", outcome.Violations, want)
+	}
+}
+
+func TestRunDoesNotReportNewlyCompleteTaskWhenTheBaseBranchFails(t *testing.T) {
+	failure := errors.New("the base branch main does not exist in the repository")
+	coord, _ := coordinator(presentDocuments("# AGENTS.md\n", "- [x] T-001 first\n- [x] T-002 second\n"))
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Failed[string](failure),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	if len(outcome.Violations) != 0 {
+		t.Fatalf("violations = %v, want none", outcome.Violations)
+	}
+	if len(outcome.Errors) != 1 || !errors.Is(outcome.Errors[0], failure) {
+		t.Fatalf("errors = %v, want the base branch failure", outcome.Errors)
+	}
+}

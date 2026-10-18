@@ -10,11 +10,17 @@ import (
 	"github.com/replworks/repl-cli/internal/docline"
 )
 
+type Entry struct {
+	ID       string
+	Complete bool
+}
+
 type Ledger struct {
 	Total             int
 	Complete          int
 	FirstIncompleteID string
 	IDs               []string
+	Entries           []Entry
 }
 
 func New(text string) Ledger {
@@ -28,6 +34,7 @@ func New(text string) Ledger {
 
 		led.Total++
 		led.addID(id)
+		led.Entries = append(led.Entries, Entry{ID: id, Complete: complete})
 		if complete {
 			led.Complete++
 			continue

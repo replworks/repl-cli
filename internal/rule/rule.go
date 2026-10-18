@@ -18,6 +18,10 @@ const RuleDocumentsExist = "documents-exist"
 // branch and does not exist in the working tree.
 const RuleTaskIDsUnchanged = "task-ids-unchanged"
 
+// RuleSingleTaskCompletion is reported when the working tree holds more than
+// one newly complete task.
+const RuleSingleTaskCompletion = "single-task-completion"
+
 // RuleAgentsCanonical is reported for an AGENTS.md that differs from the
 // canonical AGENTS.md.
 const RuleAgentsCanonical = "agents-canonical"
@@ -66,7 +70,7 @@ func (Evaluator) Evaluate(facts Facts) []Violation {
 }
 
 // order is the fixed rule evaluation order.
-var order = []func(Facts) []Violation{documentsExist, taskIDsUnchanged, agentsCanonical}
+var order = []func(Facts) []Violation{documentsExist, taskIDsUnchanged, singleTaskCompletion, agentsCanonical}
 
 func documentsExist(facts Facts) []Violation {
 	var violations []Violation
@@ -112,6 +116,47 @@ func taskIDsUnchanged(facts Facts) []Violation {
 	}
 
 	return violations
+}
+
+func singleTaskCompletion(facts Facts) []Violation {
+	count, ok := newlyCompleteCount(facts)
+	if !ok || count <= 1 {
+		return nil
+	}
+
+	return []Violation{{
+		Rule:    RuleSingleTaskCompletion,
+		Path:    tasksPath,
+		Message: fmt.Sprintf("%d tasks are newly complete", count),
+	}}
+}
+
+// newlyCompleteCount counts the working entries that are complete and whose
+// task ID is not complete in the base ledger. Entries are counted
+// individually, so duplicate IDs are separate entries. The second result is
+// false when the rule preconditions do not hold.
+func newlyCompleteCount(facts Facts) (int, bool) {
+	if !facts.WorkingLedger.IsPresent() || facts.BaseLedger.IsFailed() {
+		return 0, false
+	}
+
+	complete := map[string]bool{}
+	if facts.BaseLedger.IsPresent() {
+		for _, entry := range facts.BaseLedger.Value().Entries {
+			if entry.Complete {
+				complete[entry.ID] = true
+			}
+		}
+	}
+
+	count := 0
+	for _, entry := range facts.WorkingLedger.Value().Entries {
+		if entry.Complete && !complete[entry.ID] {
+			count++
+		}
+	}
+
+	return count, true
 }
 
 func agentsCanonical(facts Facts) []Violation {
