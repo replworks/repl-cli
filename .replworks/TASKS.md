@@ -30,7 +30,7 @@
     - After the command runs, no file or directory is created, modified, or deleted.
     - Unit tests for the Document Line Classifier and the Task Ledger Reader pass.
 
-- [ ] T-004 Report an execution error from status when TASKS.md cannot be read
+- [X] T-004 Report an execution error from status when TASKS.md cannot be read
   - Satisfies: PRODUCT_SPEC.md § Error Conditions (ERR-003); § Acceptance Criteria (AC-027); § User Interface / Commands (EL-002: exit 2 on execution error)
   - External boundary: no
   - Acceptance criteria:
