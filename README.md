@@ -33,6 +33,49 @@ make build      # go build -o repl ./cmd/repl
 make check      # gofmt check, go vet, go test
 ```
 
+## Development environment
+
+Requirements:
+
+- Go 1.26 or newer. `go.mod` declares the required version.
+- `git` on `PATH`. `repl check` reads `.replworks/TASKS.md` from the base
+  branch, and the test suite creates real repositories.
+- Dev tools: `gofmt`, `go vet`, `golangci-lint` v2.x, `govulncheck`, and
+  `goreleaser` v2.x for releases.
+
+Commands:
+
+```sh
+make build          # go build -o repl ./cmd/repl
+make test           # go test ./...
+make vet            # go vet ./...
+make lint           # golangci-lint run ./...
+make fmt            # go fmt ./...
+make check          # gofmt check, go vet, go test ./...
+```
+
+The default test suite needs no network access, no external service, and no
+manual interaction, but it does run the local `git` executable. Tests that
+contact the canonical source and real repositories carry the `e2e` build tag
+and run only on demand:
+
+```sh
+go test -tags e2e ./...   # requires network access to www.repl.net
+```
+
+Vulnerability scan:
+
+```sh
+go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+```
+
+Release, from a `vMAJOR.MINOR.PATCH` tag:
+
+```sh
+make release-check   # goreleaser check
+make snapshot        # goreleaser release --snapshot --clean
+```
+
 ## License
 
 MIT
