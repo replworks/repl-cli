@@ -87,3 +87,56 @@ func TestStatusModifiesNoFile(t *testing.T) {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
 	}
 }
+
+func TestStatusReportsErrorWhenTasksIsAbsent(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runApp(t, "status")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	lines := errorLines(t, stdout)
+	if len(lines) != 1 {
+		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
+	}
+	if !strings.Contains(lines[0], "repl:") || !strings.Contains(lines[0], "TASKS.md") {
+		t.Fatalf("error line = %q, want it to identify TASKS.md", lines[0])
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+}
+
+func TestStatusReportsErrorWhenTasksCannotBeRead(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".replworks", "TASKS.md"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runApp(t, "status")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	lines := errorLines(t, stdout)
+	if len(lines) != 1 {
+		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
+	}
+	if !strings.Contains(lines[0], "repl:") || !strings.Contains(lines[0], "TASKS.md") {
+		t.Fatalf("error line = %q, want it to identify TASKS.md", lines[0])
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+}
