@@ -177,7 +177,7 @@
     - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: when the base ledger cannot be obtained, this rule is not evaluated.
     - Unit tests for the Unverified Mark Scanner and the Rule Evaluator (no-unverified) pass.
 
-- [ ] T-017 Report check execution errors from unreadable inputs
+- [X] T-017 Report check execution errors from unreadable inputs
   - Satisfies: PRODUCT_SPEC.md § User Interface / Commands (EL-003: one line per execution error, exit 2); § Functional Requirements / check (FR-026)
   - External boundary: yes
   - Acceptance criteria:

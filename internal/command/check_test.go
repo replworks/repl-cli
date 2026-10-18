@@ -929,3 +929,101 @@ func writeDocument(t *testing.T, dir, rel, content string) {
 		t.Fatalf("setup: %v", err)
 	}
 }
+
+func TestCheckReportsEachUnreadableInputOnce(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [ ] T-001 first\n")
+	initRepository(t, dir)
+	if err := os.Remove(filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "AGENTS.md"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.Remove(filepath.Join(dir, ".replworks", "TASKS.md")); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, ".replworks", "TASKS.md"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runCommand(t, client, "check", "--base", "release")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	if len(lines) != 3 {
+		t.Fatalf("stdout = %q, want three error lines", stdout)
+	}
+	wants := []string{
+		"repl: reading AGENTS.md: ",
+		"repl: reading .replworks/TASKS.md: ",
+		"repl: the base branch release does not exist in the repository",
+	}
+	for i, prefix := range wants {
+		if !strings.HasPrefix(lines[i], prefix) {
+			t.Fatalf("line %d = %q, want the prefix %q", i+1, lines[i], prefix)
+		}
+	}
+	if strings.Contains(stdout, "documents-exist") {
+		t.Fatalf("stdout = %q, want no violation line for an unreadable document", stdout)
+	}
+	if strings.Contains(stdout, "agents-canonical") {
+		t.Fatalf("stdout = %q, want no agents-canonical line for an unreadable AGENTS.md", stdout)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+}
+
+func TestCheckKeepsEvaluatedRulesWhenADocumentIsUnreadable(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [ ] T-001 first\n")
+	initRepository(t, dir)
+	writeTasks(t, dir, "- [x] T-001 first\n")
+	writeDocument(t, dir, filepath.Join(".replworks", "PRODUCT_SPEC.md"), "## 1. Purpose [UNVERIFIED]\n")
+	agents := filepath.Join(dir, "AGENTS.md")
+	if err := os.Remove(agents); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.Mkdir(agents, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	if len(lines) != 2 {
+		t.Fatalf("stdout = %q, want one violation line and one error line", stdout)
+	}
+	if lines[0] != "no-unverified .replworks/PRODUCT_SPEC.md: UNVERIFIED mark on line 1" {
+		t.Fatalf("line 1 = %q, want the violation of a readable document", lines[0])
+	}
+	if !strings.HasPrefix(lines[1], "repl: reading AGENTS.md: ") {
+		t.Fatalf("line 2 = %q, want the AGENTS.md error", lines[1])
+	}
+	if strings.Contains(stdout, "agents-canonical") {
+		t.Fatalf("stdout = %q, want no agents-canonical line for an unreadable AGENTS.md", stdout)
+	}
+}

@@ -521,3 +521,30 @@ func TestCheckAgainstTheLiveRepositoryReportsNoUnverifiedMarkWithoutANewlyComple
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
 }
+
+func TestCheckAgainstTheLiveBoundariesReportsNoExecutionError(t *testing.T) {
+	want := liveCanonical(t)
+
+	dir := t.TempDir()
+	writeDocuments(t, dir, want)
+	writeTasks(t, dir, "- [ ] T-001 first\n- [x] T-002 second\n")
+	initRepository(t, dir)
+	t.Chdir(dir)
+
+	client, transport := liveRecordingClient()
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want no line", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if got := transport.requested(); len(got) != 1 {
+		t.Fatalf("requests = %q, want the canonical text retrieved exactly once", got)
+	}
+}
