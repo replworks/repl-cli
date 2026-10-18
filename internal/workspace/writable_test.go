@@ -113,7 +113,14 @@ func TestReplaceFile(t *testing.T) {
 }
 
 func TestWritesRejectPathsOutsideTheProjectDirectory(t *testing.T) {
-	dir := t.TempDir()
+	parent := t.TempDir()
+	if err := os.WriteFile(filepath.Join(parent, "sentinel.txt"), []byte("sentinel\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	dir := filepath.Join(parent, "project")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
 	absolute := filepath.Join(dir, "AGENTS.md")
 	writable := GrantWrite(New(dir))
 
@@ -129,5 +136,20 @@ func TestWritesRejectPathsOutsideTheProjectDirectory(t *testing.T) {
 				t.Fatalf("ReplaceFile(%q) error = nil, want an error", path)
 			}
 		})
+	}
+
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		t.Fatalf("reading the parent directory: %v", err)
+	}
+	if len(entries) != 2 || entries[0].Name() != "project" || entries[1].Name() != "sentinel.txt" {
+		t.Fatalf("parent directory = %v, want the sentinel and the project directory only", entries)
+	}
+	content, err := os.ReadFile(filepath.Join(parent, "sentinel.txt"))
+	if err != nil {
+		t.Fatalf("reading the sentinel: %v", err)
+	}
+	if string(content) != "sentinel\n" {
+		t.Fatalf("sentinel = %q, want the original content", content)
 	}
 }

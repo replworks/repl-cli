@@ -203,7 +203,7 @@
     - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: with a violation and an execution error present together, both are printed and the exit code is 2.
     - Unit tests for Command Interface rendering and exit-status mapping of check pass.
 
-- [ ] T-019 Confine every command to the project directory
+- [X] T-019 Confine every command to the project directory
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / all commands (FR-032, FR-034)
   - External boundary: yes
   - Acceptance criteria:
