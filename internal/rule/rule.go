@@ -32,6 +32,7 @@ type Facts struct {
 	Documents []Document
 	Agents    fact.Fact[string]
 	Canonical fact.Fact[string]
+	Base      fact.Fact[string]
 }
 
 // Evaluator owns the rule identifiers, their evaluation order, and their

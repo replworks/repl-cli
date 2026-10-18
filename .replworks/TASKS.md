@@ -124,7 +124,7 @@
     - Failure behavior from ARCHITECTURE.md § Failure Boundaries (canonical text cannot be obtained or extracted) passes: rule agents-canonical is not evaluated, one error line is printed, the other rules are still evaluated and reported, and the exit code is 2 even when violations exist.
     - Unit tests for the Rule Evaluator (agents-canonical) pass.
 
-- [ ] T-013 Select and validate the base branch with check
+- [X] T-013 Select and validate the base branch with check
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-020, FR-021); § Error Conditions (ERR-002); § User Interface / Commands (EL-003, EL-004); § Acceptance Criteria (AC-015, AC-016, AC-025, AC-026)
   - External boundary: yes
   - Acceptance criteria:

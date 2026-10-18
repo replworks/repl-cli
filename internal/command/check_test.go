@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -22,6 +23,7 @@ func TestCheckReportsMissingDocuments(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(recordedText(t)), 0o644); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
+	initRepository(t, dir)
 	t.Chdir(dir)
 
 	client, _ := servePage(t, string(recordedPage(t)))
@@ -60,6 +62,7 @@ func TestCheckReportsMissingDocuments(t *testing.T) {
 func TestCheckExitsZeroWithoutViolation(t *testing.T) {
 	dir := t.TempDir()
 	writeDocuments(t, dir, recordedText(t))
+	initRepository(t, dir)
 
 	t.Chdir(dir)
 
@@ -94,6 +97,7 @@ func TestCheckReportsAnExecutionErrorTogetherWithViolations(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(dir, ".replworks", "ARCHITECTURE.md"), 0o755); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
+	initRepository(t, dir)
 
 	t.Chdir(dir)
 
@@ -222,6 +226,7 @@ func writeDocuments(t *testing.T, dir, agents string) {
 func TestCheckReportsADifferentAgentsMD(t *testing.T) {
 	dir := t.TempDir()
 	writeDocuments(t, dir, "# stale\n")
+	initRepository(t, dir)
 	t.Chdir(dir)
 
 	client, transport := servePage(t, string(recordedPage(t)))
@@ -254,6 +259,7 @@ func TestCheckReportsADifferentAgentsMD(t *testing.T) {
 func TestCheckReportsALineEndingDifference(t *testing.T) {
 	dir := t.TempDir()
 	writeDocuments(t, dir, strings.ReplaceAll(recordedText(t), "\n", "\r\n"))
+	initRepository(t, dir)
 	t.Chdir(dir)
 
 	client, _ := servePage(t, string(recordedPage(t)))
@@ -274,6 +280,7 @@ func TestCheckReportsALineEndingDifference(t *testing.T) {
 func TestCheckDoesNotReportAnIdenticalAgentsMD(t *testing.T) {
 	dir := t.TempDir()
 	writeDocuments(t, dir, recordedText(t))
+	initRepository(t, dir)
 	t.Chdir(dir)
 
 	client, transport := servePage(t, string(recordedPage(t)))
@@ -300,6 +307,7 @@ func TestCheckReportsAnAbsentAgentsMDOnlyOnce(t *testing.T) {
 	if err := os.Remove(filepath.Join(dir, "AGENTS.md")); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
+	initRepository(t, dir)
 	t.Chdir(dir)
 
 	client, _ := servePage(t, string(recordedPage(t)))
@@ -329,6 +337,7 @@ func TestCheckReportsAnUnobtainableCanonicalText(t *testing.T) {
 	if err := os.Remove(filepath.Join(dir, ".replworks", "TASKS.md")); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
+	initRepository(t, dir)
 	t.Chdir(dir)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -364,5 +373,157 @@ func TestCheckReportsAnUnobtainableCanonicalText(t *testing.T) {
 
 	if after := directoryState(t, dir); after != before {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+}
+
+func TestCheckUsesTheGivenBaseBranch(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	initRepository(t, dir)
+	gitCommand(t, dir, "checkout", "-q", "-b", "dev")
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runCommand(t, client, "check", "--base", "dev")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+}
+
+func TestCheckReportsAMissingBaseBranch(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	initRepository(t, dir)
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check", "--base", "nope")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{"repl: the base branch nope does not exist in the repository"}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func TestCheckUsesMainWithoutTheBaseOption(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	gitCommand(t, dir, "init", "-q", "-b", "trunk")
+	gitCommand(t, dir, "add", "-A")
+	gitCommand(t, dir, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "project")
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{"repl: the base branch main does not exist in the repository"}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func TestCheckAcceptsASubdirectoryOfARepository(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	writeDocuments(t, sub, recordedText(t))
+	initRepository(t, dir)
+	t.Chdir(sub)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+}
+
+func TestCheckRejectsAnOptionLikeBaseBranch(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	initRepository(t, dir)
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check", "--base=-upload-pack=/bin/false")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if !strings.Contains(stdout, "repl: the base branch") {
+		t.Fatalf("stdout = %q, want the base branch error", stdout)
+	}
+}
+
+func initRepository(t *testing.T, dir string) {
+	t.Helper()
+
+	gitCommand(t, dir, "init", "-q", "-b", "main")
+	gitCommand(t, dir, "add", "-A")
+	gitCommand(t, dir, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "project")
+}
+
+func gitCommand(t *testing.T, dir string, args ...string) {
+	t.Helper()
+
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=repl-cli test",
+		"GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=repl-cli test",
+		"GIT_COMMITTER_EMAIL=test@example.com",
+		"GIT_CONFIG_NOSYSTEM=1",
+		"GIT_CONFIG_GLOBAL="+os.DevNull,
+	)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, stderr.String())
 	}
 }

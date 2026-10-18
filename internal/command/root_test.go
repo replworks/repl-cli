@@ -159,6 +159,12 @@ func directoryState(t *testing.T, dir string) string {
 		if rel == "." {
 			return nil
 		}
+		if rel == ".git" {
+			if entry.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
 		if entry.IsDir() {
 			entries = append(entries, rel+"/")
 			return nil

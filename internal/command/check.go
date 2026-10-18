@@ -5,13 +5,18 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/replworks/repl-cli/internal/basebranch"
 	"github.com/replworks/repl-cli/internal/checkproject"
 	"github.com/replworks/repl-cli/internal/rule"
 	"github.com/replworks/repl-cli/internal/workspace"
 )
 
+const defaultBase = "main"
+
 func (r *runner) newCheckCommand() *cobra.Command {
-	return &cobra.Command{
+	var base string
+
+	cmd := &cobra.Command{
 		Use:   "check",
 		Short: "Verify the project directory against the check rules",
 		Long:  "check verifies the project directory against the check rules and prints one line per violation and one line per execution error.",
@@ -25,13 +30,17 @@ func (r *runner) newCheckCommand() *cobra.Command {
 			outcome := checkproject.Coordinator{
 				Workspace: workspace.New(dir),
 				Source:    r.canonical(),
+				Bases:     basebranch.New(dir),
 				Evaluator: rule.Evaluator{},
-			}.Run()
+			}.Run(base)
 			r.status = renderCheck(cmd, outcome)
 
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&base, "base", defaultBase, "the branch to compare TASKS.md against")
+
+	return cmd
 }
 
 func renderCheck(cmd *cobra.Command, outcome checkproject.Outcome) int {
