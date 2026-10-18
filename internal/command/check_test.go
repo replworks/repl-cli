@@ -3,8 +3,11 @@ package command
 import (
 	"bytes"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -16,14 +19,15 @@ import (
 
 func TestCheckReportsMissingDocuments(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("# AGENTS.md\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(recordedText(t)), 0o644); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
 	t.Chdir(dir)
 
+	client, _ := servePage(t, string(recordedPage(t)))
 	before := directoryState(t, dir)
 
-	code, stdout, stderr := runCommand(t, nil, "check")
+	code, stdout, stderr := runCommand(t, client, "check")
 
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
@@ -55,13 +59,14 @@ func TestCheckReportsMissingDocuments(t *testing.T) {
 
 func TestCheckExitsZeroWithoutViolation(t *testing.T) {
 	dir := t.TempDir()
-	writeDocuments(t, dir)
+	writeDocuments(t, dir, recordedText(t))
 
 	t.Chdir(dir)
 
+	client, _ := servePage(t, string(recordedPage(t)))
 	before := directoryState(t, dir)
 
-	code, stdout, stderr := runCommand(t, nil, "check")
+	code, stdout, stderr := runCommand(t, client, "check")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
@@ -79,7 +84,7 @@ func TestCheckExitsZeroWithoutViolation(t *testing.T) {
 
 func TestCheckReportsAnExecutionErrorTogetherWithViolations(t *testing.T) {
 	dir := t.TempDir()
-	writeDocuments(t, dir)
+	writeDocuments(t, dir, recordedText(t))
 	if err := os.RemoveAll(filepath.Join(dir, ".replworks", "TECH_STACK.md")); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
@@ -92,9 +97,10 @@ func TestCheckReportsAnExecutionErrorTogetherWithViolations(t *testing.T) {
 
 	t.Chdir(dir)
 
+	client, _ := servePage(t, string(recordedPage(t)))
 	before := directoryState(t, dir)
 
-	code, stdout, stderr := runCommand(t, nil, "check")
+	code, stdout, stderr := runCommand(t, client, "check")
 
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2", code)
@@ -192,23 +198,171 @@ func TestRenderCheck(t *testing.T) {
 	}
 }
 
-func writeDocuments(t *testing.T, dir string) {
+func writeDocuments(t *testing.T, dir, agents string) {
 	t.Helper()
 
-	paths := []string{
-		"AGENTS.md",
-		filepath.Join(".replworks", "PRODUCT_SPEC.md"),
-		filepath.Join(".replworks", "TECH_STACK.md"),
-		filepath.Join(".replworks", "ARCHITECTURE.md"),
-		filepath.Join(".replworks", "TASKS.md"),
+	texts := map[string]string{
+		filepath.Join("AGENTS.md"):                     agents,
+		filepath.Join(".replworks", "PRODUCT_SPEC.md"): "# PRODUCT_SPEC.md\n",
+		filepath.Join(".replworks", "TECH_STACK.md"):   "# TECH_STACK.md\n",
+		filepath.Join(".replworks", "ARCHITECTURE.md"): "# ARCHITECTURE.md\n",
+		filepath.Join(".replworks", "TASKS.md"):        "# TASKS.md\n",
 	}
 
 	if err := os.Mkdir(filepath.Join(dir, ".replworks"), 0o755); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
-	for _, path := range paths {
-		if err := os.WriteFile(filepath.Join(dir, path), []byte("# "+path+"\n"), 0o644); err != nil {
+	for path, text := range texts {
+		if err := os.WriteFile(filepath.Join(dir, path), []byte(text), 0o644); err != nil {
 			t.Fatalf("setup: %v", err)
 		}
+	}
+}
+
+func TestCheckReportsADifferentAgentsMD(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, "# stale\n")
+	t.Chdir(dir)
+
+	client, transport := servePage(t, string(recordedPage(t)))
+
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{"agents-canonical AGENTS.md: AGENTS.md differs from the canonical AGENTS.md"}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+	if got := transport.requested(); len(got) != 1 {
+		t.Fatalf("requests = %q, want 1", got)
+	}
+}
+
+func TestCheckReportsALineEndingDifference(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, strings.ReplaceAll(recordedText(t), "\n", "\r\n"))
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if !strings.Contains(stdout, "agents-canonical AGENTS.md") {
+		t.Fatalf("stdout = %q, want an agents-canonical violation", stdout)
+	}
+}
+
+func TestCheckDoesNotReportAnIdenticalAgentsMD(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	t.Chdir(dir)
+
+	client, transport := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if got := transport.requested(); len(got) != 1 {
+		t.Fatalf("requests = %q, want the canonical text retrieved exactly once", got)
+	}
+}
+
+func TestCheckReportsAnAbsentAgentsMDOnlyOnce(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, "# stale\n")
+	if err := os.Remove(filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if strings.Contains(stdout, "agents-canonical") {
+		t.Fatalf("stdout = %q, want no agents-canonical violation", stdout)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{"documents-exist AGENTS.md: document does not exist"}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func TestCheckReportsAnUnobtainableCanonicalText(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, "# stale\n")
+	if err := os.Remove(filepath.Join(dir, ".replworks", "TASKS.md")); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(server.Close)
+	client := &http.Client{Transport: &recordingTransport{target: server.URL}}
+
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	if len(lines) != 2 {
+		t.Fatalf("stdout = %q, want the violation and the error", stdout)
+	}
+	if lines[0] != "documents-exist .replworks/TASKS.md: document does not exist" {
+		t.Fatalf("line 1 = %q, want the documents-exist violation first", lines[0])
+	}
+	if !strings.HasPrefix(lines[1], "repl: ") {
+		t.Fatalf("line 2 = %q, want the execution error second", lines[1])
+	}
+	if strings.Contains(stdout, "agents-canonical") {
+		t.Fatalf("stdout = %q, want no agents-canonical violation", stdout)
+	}
+
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
 	}
 }

@@ -24,6 +24,7 @@ func (r *runner) newCheckCommand() *cobra.Command {
 
 			outcome := checkproject.Coordinator{
 				Workspace: workspace.New(dir),
+				Source:    r.canonical(),
 				Evaluator: rule.Evaluator{},
 			}.Run()
 			r.status = renderCheck(cmd, outcome)

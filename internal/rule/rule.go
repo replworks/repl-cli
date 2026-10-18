@@ -8,6 +8,12 @@ import "github.com/replworks/repl-cli/internal/fact"
 // exist.
 const RuleDocumentsExist = "documents-exist"
 
+// RuleAgentsCanonical is reported for an AGENTS.md that differs from the
+// canonical AGENTS.md.
+const RuleAgentsCanonical = "agents-canonical"
+
+const agentsPath = "AGENTS.md"
+
 // Violation is a failed rule.
 type Violation struct {
 	Rule    string
@@ -24,6 +30,8 @@ type Document struct {
 // Facts is the bundle of facts that rule evaluation reads.
 type Facts struct {
 	Documents []Document
+	Agents    fact.Fact[string]
+	Canonical fact.Fact[string]
 }
 
 // Evaluator owns the rule identifiers, their evaluation order, and their
@@ -43,7 +51,7 @@ func (Evaluator) Evaluate(facts Facts) []Violation {
 }
 
 // order is the fixed rule evaluation order.
-var order = []func(Facts) []Violation{documentsExist}
+var order = []func(Facts) []Violation{documentsExist, agentsCanonical}
 
 func documentsExist(facts Facts) []Violation {
 	var violations []Violation
@@ -61,4 +69,19 @@ func documentsExist(facts Facts) []Violation {
 	}
 
 	return violations
+}
+
+func agentsCanonical(facts Facts) []Violation {
+	if !facts.Agents.IsPresent() || !facts.Canonical.IsPresent() {
+		return nil
+	}
+	if facts.Agents.Value() == facts.Canonical.Value() {
+		return nil
+	}
+
+	return []Violation{{
+		Rule:    RuleAgentsCanonical,
+		Path:    agentsPath,
+		Message: "AGENTS.md differs from the canonical AGENTS.md",
+	}}
 }
