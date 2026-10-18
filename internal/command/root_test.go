@@ -75,6 +75,34 @@ func TestExecuteRejectsUnknownOption(t *testing.T) {
 	}
 }
 
+func TestExecuteRejectsAnUnknownCommandWithoutANetworkRequest(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	client, transport := servePage(t, string(recordedPage(t)))
+
+	if code, _, stderr := runCommand(t, client, "bogus"); code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stderr = %q)", code, stderr)
+	}
+	if requests := transport.requested(); len(requests) != 0 {
+		t.Fatalf("requests = %q, want none", requests)
+	}
+}
+
+func TestExecuteRejectsAnUnknownOptionWithoutANetworkRequest(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	client, transport := servePage(t, string(recordedPage(t)))
+
+	if code, _, stderr := runCommand(t, client, "--bogus"); code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stderr = %q)", code, stderr)
+	}
+	if requests := transport.requested(); len(requests) != 0 {
+		t.Fatalf("requests = %q, want none", requests)
+	}
+}
+
 func TestExecutePrintsHelpWithoutArguments(t *testing.T) {
 	code, stdout, stderr := runApp(t)
 

@@ -189,6 +189,11 @@ func TestCanonicalFailsWhenTheSourceIsUnreachable(t *testing.T) {
 	if got.Reason() == nil {
 		t.Fatal("Canonical() reason = nil, want an error")
 	}
+
+	requests := transport.requested()
+	if len(requests) != 1 || requests[0] != SourceURL {
+		t.Fatalf("requests = %q, want one request to %q and no fallback", requests, SourceURL)
+	}
 }
 
 func TestCanonicalFailsWhenTheResponseIsUnsuccessful(t *testing.T) {

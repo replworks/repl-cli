@@ -88,6 +88,22 @@ func TestStatusModifiesNoFile(t *testing.T) {
 	}
 }
 
+func TestStatusSendsNoNetworkRequest(t *testing.T) {
+	dir := t.TempDir()
+	writeTasksFile(t, dir, "- [ ] T-001 first\n")
+	t.Chdir(dir)
+
+	client, transport := servePage(t, string(recordedPage(t)))
+
+	if code, _, stderr := runCommand(t, client, "status"); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
+	}
+
+	if requests := transport.requested(); len(requests) != 0 {
+		t.Fatalf("requests = %q, want none", requests)
+	}
+}
+
 func TestStatusReportsErrorWhenTasksIsAbsent(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
