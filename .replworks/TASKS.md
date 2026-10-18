@@ -219,11 +219,23 @@
   - External boundary: yes
   - Acceptance criteria:
     - The live canonical source is observed as in T-005.
-    - An E2E test runs init, status, check, and sync, and records every outbound network request made by each. The only addresses requested are the two published document URLs, and init requests only the selected URL.
+    - An E2E test runs init, status, check, and sync, and records every outbound network request made by each. The only addresses requested are the two published document URLs, init and sync request only their selected URL, and check requests the default URL.
     - status, unknown commands, and sync without AGENTS.md send no network request.
     - init, sync, and check each retrieve the canonical text at most once per invocation.
     - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: when the selected or default canonical text cannot be obtained, no request to any other address is made as a fallback.
     - Unit tests for the Canonical Document Provider request behavior pass.
+
+- [X] T-022 Select the AGENTS.md document during sync
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / sync (FR-027 through FR-031); § Error Conditions (ERR-007); § Acceptance Criteria (AC-020, AC-021, AC-023, AC-036, AC-037); ARCHITECTURE.md § Components (C1, C5, C7)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live behavior of both published Markdown URLs is observed.
+    - `repl sync` presents exactly the same two choices as `repl init` and accepts a valid selection.
+    - An E2E test exercises sync with each selection against the live URLs. The selected document is compared and, when different, copied exactly to AGENTS.md.
+    - An invalid selection prints the choices again and continues reading until a valid selection is entered.
+    - If the input ends or fails before a valid selection, AGENTS.md is unmodified, one error line is printed, and the exit code is 2.
+    - Existing sync comparison, difference, replacement, and local-read failure behavior remains passing for both selections.
+    - Unit tests cover selection validation, source selection, and failure handling.
 
 - [X] T-021 Select the AGENTS.md document during init
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-001 through FR-007); § Error Conditions (ERR-006); § Acceptance Criteria (AC-001, AC-002, AC-003, AC-022, AC-033, AC-034, AC-035); ARCHITECTURE.md § Components (C1, C2, C7)

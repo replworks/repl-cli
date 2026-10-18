@@ -20,7 +20,7 @@ func (r *runner) newInitCommand() *cobra.Command {
 		Long:  "init writes the canonical AGENTS.md into the project directory and creates the .replworks directory. Existing entries are left unchanged.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			document, err := selectInitDocument(cmd)
+			document, err := selectDocument(cmd)
 			if err != nil {
 				return err
 			}
@@ -41,7 +41,7 @@ func (r *runner) newInitCommand() *cobra.Command {
 	}
 }
 
-func selectInitDocument(cmd *cobra.Command) (canon.Document, error) {
+func selectDocument(cmd *cobra.Command) (canon.Document, error) {
 	out := cmd.OutOrStdout()
 	scanner := bufio.NewScanner(cmd.InOrStdin())
 	for {

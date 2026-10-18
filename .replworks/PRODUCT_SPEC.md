@@ -40,7 +40,7 @@
   - https://www.repl.net/documents/agents.md
   - https://www.repl.net/documents/agents-auto.md
 - Init document selection: the document selected interactively for the current `repl init` invocation. The selection is not persisted.
-- Default canonical document: `https://www.repl.net/documents/agents.md`, used by commands that do not receive an init document selection.
+- Default canonical document: `https://www.repl.net/documents/agents.md`, used by commands that do not receive a document selection, currently `repl check`.
 - Authoritative documents: the five files AGENTS.md, .replworks/PRODUCT_SPEC.md, .replworks/TECH_STACK.md, .replworks/ARCHITECTURE.md, .replworks/TASKS.md.
 - Task: an entry in TASKS.md that has a task ID and a completion state.
 - Task ID: the identifier of a task.
@@ -99,7 +99,7 @@
   - Exit: not applicable.
 - EL-005: repl sync
   - Purpose: replace AGENTS.md with the canonical AGENTS.md.
-  - Input: none.
+  - Input: an interactive selection of one of the two published AGENTS.md documents.
   - Output: an indication that AGENTS.md is up to date, or a line-by-line difference between the local AGENTS.md and the canonical AGENTS.md.
   - Exit: 0 on completion, 2 on execution error.
 
@@ -150,11 +150,11 @@
 
 ### sync
 
-- FR-027: repl sync MUST NOT modify AGENTS.md when its content is identical to the canonical AGENTS.md.
-- FR-028: repl sync MUST print an indication that AGENTS.md is up to date when its content is identical to the canonical AGENTS.md.
-- FR-029: repl sync MUST print the line-by-line difference between the local AGENTS.md and the canonical AGENTS.md when the contents differ.
-- FR-030: repl sync MUST replace the content of AGENTS.md with the canonical AGENTS.md content when the contents differ.
-- FR-031: repl sync MUST exit with code 0 when it completes.
+- FR-027: repl sync MUST present the user with exactly the same two document choices as repl init and use the selected document as its canonical content.
+- FR-028: repl sync MUST NOT modify AGENTS.md when its content is identical to the selected document.
+- FR-029: repl sync MUST print an indication that AGENTS.md is up to date when its content is identical to the selected document.
+- FR-030: repl sync MUST print the line-by-line difference between the local AGENTS.md and the selected document when the contents differ.
+- FR-031: repl sync MUST replace the content of AGENTS.md with the selected document's content when the contents differ.
 
 ### all commands
 
@@ -167,7 +167,7 @@
 - Flow 1: the user runs repl init in an empty directory -> the user selects one of the two published documents -> AGENTS.md contains that document and .replworks/ exists -> the user runs repl check.
 - Flow 2: the user runs repl status -> the user reads the number of complete tasks and the next task ID.
 - Flow 3: the user runs repl check in a continuous integration job -> the job fails when the exit code is not 0.
-- Flow 4: the user runs repl sync -> the user reads the difference -> AGENTS.md equals the canonical AGENTS.md.
+- Flow 4: the user runs repl sync -> the user selects a published document -> the user reads the difference -> AGENTS.md equals the selected document.
 
 ## Error Conditions
 
@@ -202,6 +202,10 @@
   - repl init MUST NOT create or modify any file.
   - repl init MUST print an error line.
   - repl init MUST exit with code 2.
+- ERR-007: The sync input ends or fails before the user selects one of the two sync documents.
+  - repl sync MUST NOT modify AGENTS.md.
+  - repl sync MUST print an error line.
+  - repl sync MUST exit with code 2.
 
 ## Non-Goals
 
@@ -230,10 +234,10 @@
 - AC-017: Given a TASKS.md that does not exist on the base branch, when repl check runs, then every complete task in the working tree is a newly complete task. (FR-022, EL-003)
 - AC-018: Given a project directory without TASKS.md, when repl check runs, then no line reports rules task-ids-unchanged, single-task-completion, or no-unverified. (FR-023, EL-003)
 - AC-019: Given a project directory, when repl check runs, then no file is modified. (FR-019, EL-003)
-- AC-020: Given an AGENTS.md identical to the canonical AGENTS.md, when repl sync runs, then the file is unmodified, the output indicates that AGENTS.md is up to date, and the exit code is 0. (FR-027, FR-028, FR-031, EL-005)
-- AC-021: Given an AGENTS.md that differs from the canonical AGENTS.md, when repl sync runs, then the output contains the line-by-line difference, AGENTS.md equals the canonical AGENTS.md, and the exit code is 0. (FR-029, FR-030, FR-031, EL-005)
+- AC-020: Given an AGENTS.md identical to the selected document, when repl sync runs, then the file is unmodified, the output indicates that AGENTS.md is up to date, and the exit code is 0. (FR-027, FR-028, FR-031, EL-005)
+- AC-021: Given an AGENTS.md that differs from the selected document, when repl sync runs, then the output contains the line-by-line difference, AGENTS.md equals the selected document, and the exit code is 0. (FR-027, FR-029, FR-030, FR-031, EL-005)
 - AC-022: Given that the selected init document is unreachable, when repl init runs, then no file is created or modified, an error line is printed, and the exit code is 2. (ERR-001, EL-001)
-- AC-023: Given that https://www.repl.net/documents/agents.md is unreachable, when repl sync runs, then AGENTS.md is unmodified, an error line is printed, and the exit code is 2. (ERR-001, EL-005)
+- AC-023: Given that the selected sync document is unreachable, when repl sync runs, then AGENTS.md is unmodified, an error line is printed, and the exit code is 2. (ERR-001, EL-005)
 - AC-024: Given that https://www.repl.net/documents/agents.md is unreachable and a violation of rule documents-exist exists, when repl check runs, then the violation is reported, an error line is printed, and the exit code is 2. (ERR-001, FR-026, EL-003)
 - AC-025: Given a directory that is not a git repository, when repl check runs, then rules documents-exist and agents-canonical are evaluated, an error line is printed, and the exit code is 2. (ERR-002, EL-003)
 - AC-026: Given a base branch that does not exist, when repl check runs, then an error line is printed and the exit code is 2. (ERR-002, EL-003, EL-004)
@@ -241,8 +245,10 @@
 - AC-028: Given a project directory without AGENTS.md, when repl sync runs, then no file is created, an error line is printed, and the exit code is 2. (ERR-004, EL-005)
 - AC-029: Given an unknown command, when repl-cli runs, then no file is modified, an error line is printed, and the exit code is 2. (ERR-005)
 - AC-030: Given an unknown option, when repl-cli runs, then no file is modified, an error line is printed, and the exit code is 2. (ERR-005)
-- AC-031: Given any command, when it runs, then no network request is sent to any address other than the two published document URLs, and init requests only the selected URL. (FR-033)
+- AC-031: Given any command, when it runs, then no network request is sent to any address other than the two published document URLs, and init and sync request only their selected URL. (FR-033)
 - AC-032: Given repl status or repl check, when it runs, then no file is created, modified, or deleted. (FR-012, FR-019, FR-034)
 - AC-033: Given an empty directory and a valid selection of `https://www.repl.net/documents/agents-auto.md`, when repl init runs, then AGENTS.md exists with that document's exact content, the .replworks/ directory exists, and the exit code is 0. (FR-001, FR-002, FR-005, FR-007, EL-001)
 - AC-034: Given an empty directory and an invalid init selection followed by a valid selection, when repl init runs, then repl init presents the choices again, creates the selected document, and exits with code 0. (FR-001, FR-002, EL-001)
 - AC-035: Given an empty directory and an init input that ends before a valid selection, when repl init runs, then no file is created or modified, an error line is printed, and the exit code is 2. (ERR-006, EL-001)
+- AC-036: Given an AGENTS.md and an invalid sync selection followed by a valid selection, when repl sync runs, then repl sync presents the choices again and completes using the selected document. (FR-027, EL-005)
+- AC-037: Given an AGENTS.md and a sync input that ends before a valid selection, when repl sync runs, then AGENTS.md is unmodified, an error line is printed, and the exit code is 2. (ERR-007, EL-005)

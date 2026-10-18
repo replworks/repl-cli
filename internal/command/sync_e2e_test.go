@@ -8,7 +8,35 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/replworks/repl-cli/internal/canon"
 )
+
+func TestSyncAgainstTheLiveAutomaticSource(t *testing.T) {
+	want := liveDocument(t, canon.AgentsAutoDocument)
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("# stale\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	code, stdout, stderr := runCommandWithInput(t, nil, "2\n", "sync")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("reading AGENTS.md: %v", err)
+	}
+	if string(content) != want {
+		t.Fatal("AGENTS.md does not hold the selected live document")
+	}
+}
 
 func TestSyncAgainstTheLiveSourceReportsUpToDate(t *testing.T) {
 	want := liveCanonical(t)
@@ -125,8 +153,8 @@ func TestSyncAgainstTheLiveSourceKeepsAGENTSMDWhenTheSourceIsUnobtainable(t *tes
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
-	if lines := errorLines(t, stdout); len(lines) != 1 {
-		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
+	if count := strings.Count(stdout, "repl:"); count != 1 {
+		t.Fatalf("stdout has %d error lines (%q), want 1", count, stdout)
 	}
 	if after := directoryState(t, dir); after != before {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)

@@ -17,13 +17,18 @@ func (r *runner) newSyncCommand() *cobra.Command {
 		Long:  "sync compares AGENTS.md with the canonical AGENTS.md, prints the line-by-line difference, and replaces AGENTS.md with the canonical content when the contents differ.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			document, err := selectDocument(cmd)
+			if err != nil {
+				return err
+			}
+
 			dir, err := r.projectDir()
 			if err != nil {
 				return err
 			}
 
 			outcome := syncproject.Coordinator{
-				Source:     r.canonical(),
+				Source:     r.canonical(document),
 				Workspace:  workspace.GrantWrite(workspace.New(dir)),
 				Difference: diff.Calculator{},
 			}.Run()
