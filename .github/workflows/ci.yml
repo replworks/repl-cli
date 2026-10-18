@@ -23,9 +23,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Read the Go version from go.mod
+        id: go
+        shell: bash
+        run: |
+          set -eu
+          version="$(sed -n 's/^go \([0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' go.mod)"
+          if [ -z "$version" ]; then
+            echo "go.mod does not declare a Go version" >&2
+            exit 1
+          fi
+          echo "minor=$version" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: ${{ steps.go.outputs.minor }}
+          check-latest: true
           cache: true
 
       - name: Check formatting
@@ -38,11 +51,15 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.2.1
+          version: v2.14.0
           verify: false
 
       - name: Test
         run: go test ./...
+
+      - name: Live E2E test
+        if: matrix.os == 'ubuntu-latest'
+        run: go test -tags e2e ./...
 
   govulncheck:
     name: govulncheck
@@ -50,9 +67,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Read the Go version from go.mod
+        id: go
+        shell: bash
+        run: |
+          set -eu
+          version="$(sed -n 's/^go \([0-9][0-9]*\.[0-9][0-9]*\).*$/\1/p' go.mod)"
+          if [ -z "$version" ]; then
+            echo "go.mod does not declare a Go version" >&2
+            exit 1
+          fi
+          echo "minor=$version" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: ${{ steps.go.outputs.minor }}
+          check-latest: true
           cache: true
 
       - name: Run govulncheck

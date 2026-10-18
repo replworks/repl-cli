@@ -3,18 +3,22 @@ package command
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/replworks/repl-cli/internal/canon"
 )
 
 type App struct {
-	Version string
-	Commit  string
-	Date    string
-	Stdout  io.Writer
-	Stderr  io.Writer
+	Version    string
+	Commit     string
+	Date       string
+	Stdout     io.Writer
+	Stderr     io.Writer
+	HTTPClient *http.Client
 }
 
 func (a App) Execute(args []string) int {
@@ -31,8 +35,17 @@ func (a App) Execute(args []string) int {
 }
 
 type runner struct {
-	app    App
-	status int
+	app             App
+	status          int
+	canonicalSource *canon.Provider
+}
+
+func (r *runner) canonical() *canon.Provider {
+	if r.canonicalSource == nil {
+		r.canonicalSource = canon.New(r.app.HTTPClient)
+	}
+
+	return r.canonicalSource
 }
 
 func (r *runner) newRootCommand() *cobra.Command {
@@ -54,6 +67,7 @@ func (r *runner) newRootCommand() *cobra.Command {
 	root.SetOut(r.app.Stdout)
 	root.SetErr(r.app.Stderr)
 	root.AddCommand(r.newStatusCommand())
+	root.AddCommand(r.newInitCommand())
 
 	return root
 }

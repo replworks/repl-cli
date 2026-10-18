@@ -38,7 +38,7 @@
     - Given a TASKS.md whose read fails (simulated read failure), one error line is printed, the exit code is 2, and no file is created or modified.
     - Unit tests for the Status Coordinator failure handling pass.
 
-- [ ] T-005 Create AGENTS.md and .replworks/ with init
+- [X] T-005 Create AGENTS.md and .replworks/ with init
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-001, FR-002, FR-004, FR-005, FR-007); § User Interface / Commands (EL-001); § Acceptance Criteria (AC-001, AC-003, AC-022)
   - External boundary: yes
   - Acceptance criteria:
