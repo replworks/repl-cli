@@ -162,7 +162,7 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
   - Obtain the Canonical Text from the source selected by the request. The allowed sources are the two published Markdown documents in PRODUCT_SPEC.md.
   - Return the Canonical Text exactly as the canonical content, with no normalization.
   - Retrieve at most once per invocation. Later requests in the same invocation reuse the first result, including a failure.
-  - Treat these as `Failed`: source unreachable, unsuccessful response, or no single canonical text can be extracted from the source.
+  - Treat these as `Failed`: source unreachable, unsuccessful response, or an empty response from the source.
   - Keep the source's representation private. Other components never see it.
 - Inputs: a source selection. Init supplies the user's selection; commands without a selection use PRODUCT_SPEC.md's default canonical document.
 - Outputs: `Present(Canonical Text) | Failed(reason)`.

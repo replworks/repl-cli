@@ -225,7 +225,7 @@
     - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: when the selected or default canonical text cannot be obtained, no request to any other address is made as a fallback.
     - Unit tests for the Canonical Document Provider request behavior pass.
 
-- [ ] T-021 Select the AGENTS.md document during init
+- [X] T-021 Select the AGENTS.md document during init
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-001 through FR-007); § Error Conditions (ERR-006); § Acceptance Criteria (AC-001, AC-002, AC-003, AC-022, AC-033, AC-034); ARCHITECTURE.md § Components (C1, C2, C7)
   - External boundary: yes
   - Acceptance criteria:

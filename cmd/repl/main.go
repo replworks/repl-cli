@@ -17,6 +17,7 @@ func main() {
 		Version: version,
 		Commit:  commit,
 		Date:    date,
+		Stdin:   os.Stdin,
 		Stdout:  os.Stdout,
 		Stderr:  os.Stderr,
 	}

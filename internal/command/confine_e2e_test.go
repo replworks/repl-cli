@@ -45,7 +45,7 @@ func TestCommandsAreConfinedToTheProjectDirectory(t *testing.T) {
 			if tt.documents {
 				agents := tt.agents
 				if agents == "" {
-					agents = recordedText(t)
+					agents = liveCanonical(t)
 				}
 				writeDocuments(t, project, agents)
 			}

@@ -11,21 +11,7 @@ import (
 	"testing"
 )
 
-const (
-	recordedPagePath = "testdata/agents.html"
-	recordedTextPath = "testdata/canonical.txt"
-)
-
-func recordedPage(t *testing.T) []byte {
-	t.Helper()
-
-	page, err := os.ReadFile(recordedPagePath)
-	if err != nil {
-		t.Fatalf("reading the recorded page: %v", err)
-	}
-
-	return page
-}
+const recordedTextPath = "testdata/canonical.txt"
 
 func recordedText(t *testing.T) string {
 	t.Helper()
@@ -87,63 +73,58 @@ func serve(t *testing.T, handler http.HandlerFunc) (*http.Client, *recordingTran
 	return &http.Client{Transport: transport}, transport
 }
 
-func servePage(t *testing.T, page string) (*http.Client, *recordingTransport) {
+func serveText(t *testing.T, text string) (*http.Client, *recordingTransport) {
 	t.Helper()
 
 	return serve(t, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = io.WriteString(w, page)
+		_, _ = io.WriteString(w, text)
 	})
 }
 
-func TestCanonicalFromTheRecordedPage(t *testing.T) {
-	client, _ := servePage(t, string(recordedPage(t)))
+func TestCanonicalReturnsTheExactDocumentResponse(t *testing.T) {
+	want := recordedText(t)
+	client, _ := serveText(t, want)
 
 	got := New(client).Canonical()
 
 	if !got.IsPresent() {
 		t.Fatalf("Canonical() = %v, want present", got.Kind())
 	}
-
-	want := recordedText(t)
 	if got.Value() != want {
-		t.Fatalf("Canonical() = %q, want the recorded canonical text", got.Value())
-	}
-	if strings.Contains(got.Value(), separator) {
-		t.Fatal("Canonical() still holds the line separator used by the source")
-	}
-	if strings.HasPrefix(got.Value(), "\n") || strings.HasSuffix(got.Value(), "\n") {
-		t.Fatalf("Canonical() = %q, want no leading or trailing newline", got.Value())
+		t.Fatalf("Canonical() = %q, want the exact response", got.Value())
 	}
 }
 
-func TestRecordedTestdataIsByteExact(t *testing.T) {
-	if text := recordedText(t); strings.Contains(text, "\r") {
-		t.Fatal("the recorded canonical text holds carriage returns: testdata must be checked out byte-exact (see .gitattributes)")
+func TestCanonicalCanSelectTheAutomaticDocument(t *testing.T) {
+	want := "# AGENTS.md\n\n## AUTO_RUN\n"
+	client, transport := serveText(t, want)
+
+	got := NewForDocument(client, AgentsAutoDocument).Canonical()
+
+	if !got.IsPresent() || got.Value() != want {
+		t.Fatalf("Canonical() = %v, want %q", got, want)
 	}
-	if page := string(recordedPage(t)); strings.Contains(page, "\r\n") {
-		t.Fatal("the recorded page holds carriage returns: testdata must be checked out byte-exact (see .gitattributes)")
+	requests := transport.requested()
+	if len(requests) != 1 || requests[0] != string(AgentsAutoDocument) {
+		t.Fatalf("requests = %q, want one request to %q", requests, AgentsAutoDocument)
 	}
 }
 
-func TestCanonicalRequestsOnlyTheCanonicalSource(t *testing.T) {
-	client, transport := servePage(t, string(recordedPage(t)))
+func TestCanonicalRequestsOnlyTheSelectedSource(t *testing.T) {
+	client, transport := serveText(t, recordedText(t))
 
-	if got := New(client).Canonical(); !got.IsPresent() {
+	if got := NewForDocument(client, AgentsAutoDocument).Canonical(); !got.IsPresent() {
 		t.Fatalf("Canonical() = %v, want present", got.Kind())
 	}
 
 	got := transport.requested()
-	if len(got) != 1 {
-		t.Fatalf("requests = %q, want 1 request", got)
-	}
-	if got[0] != SourceURL {
-		t.Fatalf("requested %q, want %q", got[0], SourceURL)
+	if len(got) != 1 || got[0] != string(AgentsAutoDocument) {
+		t.Fatalf("requests = %q, want one request to %q", got, AgentsAutoDocument)
 	}
 }
 
 func TestCanonicalRetrievesTheSourceOnce(t *testing.T) {
-	client, transport := servePage(t, string(recordedPage(t)))
+	client, transport := serveText(t, recordedText(t))
 	provider := New(client)
 
 	first := provider.Canonical()
@@ -152,11 +133,8 @@ func TestCanonicalRetrievesTheSourceOnce(t *testing.T) {
 	if transport.count() != 1 {
 		t.Fatalf("requests = %d, want 1", transport.count())
 	}
-	if !first.IsPresent() || !second.IsPresent() {
-		t.Fatalf("Canonical() = %v and %v, want present", first.Kind(), second.Kind())
-	}
-	if first.Value() != second.Value() {
-		t.Fatal("Canonical() returned two different texts")
+	if !first.IsPresent() || !second.IsPresent() || first.Value() != second.Value() {
+		t.Fatalf("Canonical() = %v and %v, want the same present fact", first.Kind(), second.Kind())
 	}
 }
 
@@ -178,18 +156,14 @@ func TestCanonicalRetrievesTheSourceOnceWhenItFails(t *testing.T) {
 }
 
 func TestCanonicalFailsWhenTheSourceIsUnreachable(t *testing.T) {
-	client, transport := servePage(t, string(recordedPage(t)))
+	client, transport := serveText(t, recordedText(t))
 	transport.target = "http://127.0.0.1:1"
 
 	got := New(client).Canonical()
 
-	if !got.IsFailed() {
-		t.Fatalf("Canonical() = %v, want failed", got.Kind())
+	if !got.IsFailed() || got.Reason() == nil {
+		t.Fatalf("Canonical() = %v, want failed with a reason", got.Kind())
 	}
-	if got.Reason() == nil {
-		t.Fatal("Canonical() reason = nil, want an error")
-	}
-
 	requests := transport.requested()
 	if len(requests) != 1 || requests[0] != SourceURL {
 		t.Fatalf("requests = %q, want one request to %q and no fallback", requests, SourceURL)
@@ -203,43 +177,17 @@ func TestCanonicalFailsWhenTheResponseIsUnsuccessful(t *testing.T) {
 
 	got := New(client).Canonical()
 
-	if !got.IsFailed() {
-		t.Fatalf("Canonical() = %v, want failed", got.Kind())
-	}
-	if got.Reason() == nil || !strings.Contains(got.Reason().Error(), "404") {
-		t.Fatalf("Canonical() reason = %v, want it to mention the status", got.Reason())
+	if !got.IsFailed() || got.Reason() == nil || !strings.Contains(got.Reason().Error(), "404") {
+		t.Fatalf("Canonical() = %v, want a failed fact mentioning 404", got)
 	}
 }
 
-func TestCanonicalFailsWithoutACanonicalText(t *testing.T) {
-	client, _ := servePage(t, "<html><body><pre>AGENTS.md</pre></body></html>")
+func TestCanonicalFailsWhenTheResponseIsEmpty(t *testing.T) {
+	client, _ := serveText(t, "")
 
 	got := New(client).Canonical()
 
 	if !got.IsFailed() {
 		t.Fatalf("Canonical() = %v, want failed", got.Kind())
-	}
-}
-
-func TestCanonicalFailsWithSeveralCanonicalTexts(t *testing.T) {
-	page := `<html><body><button data-code="one">a</button><button data-code="two">b</button></body></html>`
-	client, _ := servePage(t, page)
-
-	got := New(client).Canonical()
-
-	if !got.IsFailed() {
-		t.Fatalf("Canonical() = %v, want failed", got.Kind())
-	}
-}
-
-func TestExtractDecodesEntitiesAndSplitsLines(t *testing.T) {
-	page := `<html><body><button data-code="&#x60;code&#x60;` + separator + `next"></button></body></html>`
-
-	got, err := extract([]byte(page))
-	if err != nil {
-		t.Fatalf("extract() error = %v, want nil", err)
-	}
-	if want := "`code`\nnext"; got != want {
-		t.Fatalf("extract() = %q, want %q", got, want)
 	}
 }

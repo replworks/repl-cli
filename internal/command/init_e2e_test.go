@@ -14,9 +14,13 @@ import (
 )
 
 func liveCanonical(t *testing.T) string {
+	return liveDocument(t, canon.AgentsDocument)
+}
+
+func liveDocument(t *testing.T, document canon.Document) string {
 	t.Helper()
 
-	canonical := canon.New(nil).Canonical()
+	canonical := canon.NewForDocument(nil, document).Canonical()
 	if !canonical.IsPresent() {
 		t.Fatalf("the live canonical source is unreachable: %v", canonical.Reason())
 	}
@@ -25,6 +29,32 @@ func liveCanonical(t *testing.T) string {
 	}
 
 	return canonical.Value()
+}
+
+func TestInitAgainstTheLiveAutomaticSource(t *testing.T) {
+	want := liveDocument(t, canon.AgentsAutoDocument)
+
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	code, stdout, stderr := runCommandWithInput(t, nil, "2\n", "init")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("reading AGENTS.md: %v", err)
+	}
+	if string(content) != want {
+		t.Fatal("AGENTS.md does not hold the selected live AGENTS.md")
+	}
+	if info, err := os.Stat(filepath.Join(dir, ".replworks")); err != nil || !info.IsDir() {
+		t.Fatalf("stat .replworks: %v, want a directory", err)
+	}
 }
 
 func TestInitAgainstTheLiveSource(t *testing.T) {
@@ -201,8 +231,8 @@ func TestInitAgainstTheLiveSourceWritesNothingWhenTheSourceIsUnobtainable(t *tes
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
-	if lines := errorLines(t, stdout); len(lines) != 1 {
-		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
+	if count := strings.Count(stdout, "repl:"); count != 1 {
+		t.Fatalf("stdout has %d error lines (%q), want 1", count, stdout)
 	}
 	if after := directoryState(t, dir); after != before {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
@@ -233,8 +263,8 @@ func TestInitAgainstTheLiveSourceReportsAWriteFailure(t *testing.T) {
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
-	if lines := errorLines(t, stdout); len(lines) != 1 {
-		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
+	if count := strings.Count(stdout, "repl:"); count != 1 {
+		t.Fatalf("stdout has %d error lines (%q), want 1", count, stdout)
 	}
 
 	entries, err := os.ReadDir(dir)

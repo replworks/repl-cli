@@ -15,6 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/replworks/repl-cli/internal/canon"
 	"github.com/replworks/repl-cli/internal/initproject"
 )
 
@@ -33,9 +34,9 @@ var recordedTestdata = func() string {
 func recordedPage(t *testing.T) []byte {
 	t.Helper()
 
-	page, err := os.ReadFile(filepath.Join(recordedTestdata, "agents.html"))
+	page, err := os.ReadFile(filepath.Join(recordedTestdata, "canonical.txt"))
 	if err != nil {
-		t.Fatalf("reading the recorded page: %v", err)
+		t.Fatalf("reading the recorded document: %v", err)
 	}
 
 	return page
@@ -105,12 +106,107 @@ func runCommand(t *testing.T, client *http.Client, args ...string) (int, string,
 		Version:    "dev",
 		Commit:     "none",
 		Date:       "unknown",
+		Stdin:      strings.NewReader("1\n"),
 		Stdout:     &stdout,
 		Stderr:     &stderr,
 		HTTPClient: client,
 	}
 
 	return app.Execute(args), stdout.String(), stderr.String()
+}
+
+func runCommandWithInput(t *testing.T, client *http.Client, input string, args ...string) (int, string, string) {
+	t.Helper()
+
+	var stdout, stderr bytes.Buffer
+	app := App{
+		Version:    "dev",
+		Commit:     "none",
+		Date:       "unknown",
+		Stdin:      strings.NewReader(input),
+		Stdout:     &stdout,
+		Stderr:     &stderr,
+		HTTPClient: client,
+	}
+
+	return app.Execute(args), stdout.String(), stderr.String()
+}
+
+func TestInitUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	want := "# AGENTS.md\n\n## AUTO_RUN\n"
+	client, transport := servePage(t, want)
+
+	code, stdout, stderr := runCommandWithInput(t, client, "2\n", "init")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("reading AGENTS.md: %v", err)
+	}
+	if string(content) != want {
+		t.Fatalf("AGENTS.md = %q, want %q", content, want)
+	}
+	requests := transport.requested()
+	if len(requests) != 1 || requests[0] != string(canon.AgentsAutoDocument) {
+		t.Fatalf("requests = %q, want one request to %q", requests, canon.AgentsAutoDocument)
+	}
+}
+
+func TestInitRejectsAnInvalidDocumentSelectionWithoutNetworkOrWrites(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	client, transport := servePage(t, "# AGENTS.md\n")
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runCommandWithInput(t, client, "3\n", "init")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if stdout == "" || !strings.Contains(stdout, "Choice [1-2]:") {
+		t.Fatalf("stdout = %q, want the selection prompt", stdout)
+	}
+	if stderr == "" || !strings.Contains(stderr, "must be 1 or 2") {
+		t.Fatalf("stderr = %q, want the selection error", stderr)
+	}
+	if got := transport.requested(); len(got) != 0 {
+		t.Fatalf("requests = %q, want none", got)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+}
+
+func TestInitRejectsMissingDocumentSelectionWithoutNetworkOrWrites(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	client, transport := servePage(t, "# AGENTS.md\n")
+	before := directoryState(t, dir)
+
+	code, _, stderr := runCommandWithInput(t, client, "", "init")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if stderr == "" || !strings.Contains(stderr, "selection is required") {
+		t.Fatalf("stderr = %q, want the missing-selection error", stderr)
+	}
+	if got := transport.requested(); len(got) != 0 {
+		t.Fatalf("requests = %q, want none", got)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
 }
 
 func TestInitCreatesAgentsAndReplworks(t *testing.T) {
@@ -254,12 +350,8 @@ func TestInitFailsWhenTheCanonicalSourceIsUnavailable(t *testing.T) {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
 
-	lines := errorLines(t, stdout)
-	if len(lines) != 1 {
-		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
-	}
-	if !strings.Contains(lines[0], "repl:") {
-		t.Fatalf("error line = %q, want it to start with the program name", lines[0])
+	if count := strings.Count(stdout, "repl:"); count != 1 {
+		t.Fatalf("stdout has %d error lines (%q), want 1", count, stdout)
 	}
 
 	if after := directoryState(t, dir); after != before {
@@ -271,7 +363,7 @@ func TestInitFailsWithoutAnExtractableCanonicalText(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 
-	client, _ := servePage(t, "<html><body><pre>AGENTS.md</pre></body></html>")
+	client, _ := servePage(t, "")
 
 	before := directoryState(t, dir)
 
@@ -283,8 +375,8 @@ func TestInitFailsWithoutAnExtractableCanonicalText(t *testing.T) {
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
-	if lines := errorLines(t, stdout); len(lines) != 1 {
-		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
+	if count := strings.Count(stdout, "repl:"); count != 1 {
+		t.Fatalf("stdout has %d error lines (%q), want 1", count, stdout)
 	}
 
 	if after := directoryState(t, dir); after != before {
