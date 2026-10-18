@@ -761,3 +761,171 @@ func TestCheckCountsDuplicateTaskIDsAsSeparateEntries(t *testing.T) {
 		t.Fatalf("stdout = %q, want %q", stdout, want)
 	}
 }
+
+func TestCheckReportsAnUnverifiedMark(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [ ] T-001 first\n")
+	initRepository(t, dir)
+	writeTasks(t, dir, "- [x] T-001 first\n")
+	writeDocument(t, dir, filepath.Join(".replworks", "PRODUCT_SPEC.md"), "# PRODUCT_SPEC.md\n\n## 1. Purpose [UNVERIFIED]\n")
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{"no-unverified .replworks/PRODUCT_SPEC.md: UNVERIFIED mark on line 3"}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+}
+
+func TestCheckDoesNotReportAnUnverifiedMarkWithoutANewlyCompleteTask(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [x] T-001 first\n")
+	initRepository(t, dir)
+	writeDocument(t, dir, filepath.Join(".replworks", "PRODUCT_SPEC.md"), "## 1. Purpose [UNVERIFIED]\n")
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+}
+
+func TestCheckReportsEveryUnverifiedMarkInOrder(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [ ] T-001 first\n")
+	initRepository(t, dir)
+	writeTasks(t, dir, "- [x] T-001 first\n")
+	writeDocument(t, dir, filepath.Join(".replworks", "PRODUCT_SPEC.md"),
+		"# PRODUCT_SPEC.md\n## 1. Purpose [UNVERIFIED]\n\n## 2. Scope [UNVERIFIED] and [UNVERIFIED]\n")
+	writeDocument(t, dir, filepath.Join(".replworks", "TECH_STACK.md"), "## 6. CI [UNVERIFIED]\n")
+	writeDocument(t, dir, filepath.Join(".replworks", "ARCHITECTURE.md"),
+		"```\n## In a fence [UNVERIFIED]\n```\n## 7. Data Flow [UNVERIFIED]\n")
+	if err := os.WriteFile(filepath.Join(dir, ".replworks", "TASKS.md"), []byte("- [x] T-001 first\n\nAdd [UNVERIFIED] here.\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{
+		"no-unverified .replworks/PRODUCT_SPEC.md: UNVERIFIED mark on line 2",
+		"no-unverified .replworks/PRODUCT_SPEC.md: UNVERIFIED mark on line 4",
+		"no-unverified .replworks/PRODUCT_SPEC.md: UNVERIFIED mark on line 4",
+		"no-unverified .replworks/TECH_STACK.md: UNVERIFIED mark on line 1",
+		"no-unverified .replworks/ARCHITECTURE.md: UNVERIFIED mark on line 4",
+	}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func TestCheckDoesNotReportMarksOfAnAbsentDocument(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [ ] T-001 first\n")
+	initRepository(t, dir)
+	writeTasks(t, dir, "- [x] T-001 first\n")
+	writeDocument(t, dir, filepath.Join(".replworks", "PRODUCT_SPEC.md"), "## 1. Purpose [UNVERIFIED]\n")
+	if err := os.Remove(filepath.Join(dir, ".replworks", "TECH_STACK.md")); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{
+		"documents-exist .replworks/TECH_STACK.md: document does not exist",
+		"no-unverified .replworks/PRODUCT_SPEC.md: UNVERIFIED mark on line 1",
+	}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func TestCheckDoesNotReportMarksWithoutTasksInTheWorkingTree(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [x] T-001 first\n")
+	initRepository(t, dir)
+	writeDocument(t, dir, filepath.Join(".replworks", "PRODUCT_SPEC.md"), "## 1. Purpose [UNVERIFIED]\n")
+	if err := os.Remove(filepath.Join(dir, ".replworks", "TASKS.md")); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{"documents-exist .replworks/TASKS.md: document does not exist"}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func writeDocument(t *testing.T, dir, rel, content string) {
+	t.Helper()
+
+	path := filepath.Join(dir, rel)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+}

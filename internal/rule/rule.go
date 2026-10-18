@@ -8,6 +8,7 @@ import (
 
 	"github.com/replworks/repl-cli/internal/fact"
 	"github.com/replworks/repl-cli/internal/ledger"
+	"github.com/replworks/repl-cli/internal/mark"
 )
 
 // RuleDocumentsExist is reported for each authoritative document that does not
@@ -21,6 +22,10 @@ const RuleTaskIDsUnchanged = "task-ids-unchanged"
 // RuleSingleTaskCompletion is reported when the working tree holds more than
 // one newly complete task.
 const RuleSingleTaskCompletion = "single-task-completion"
+
+// RuleNoUnverified is reported for each UNVERIFIED mark while the working tree
+// holds at least one newly complete task.
+const RuleNoUnverified = "no-unverified"
 
 // RuleAgentsCanonical is reported for an AGENTS.md that differs from the
 // canonical AGENTS.md.
@@ -44,6 +49,12 @@ type Document struct {
 	Text fact.Fact[string]
 }
 
+// MarkList is the fact of the marks of one document.
+type MarkList struct {
+	Path  string
+	Marks fact.Fact[[]mark.Mark]
+}
+
 // Facts is the bundle of facts that rule evaluation reads.
 type Facts struct {
 	Documents     []Document
@@ -51,6 +62,7 @@ type Facts struct {
 	Canonical     fact.Fact[string]
 	WorkingLedger fact.Fact[ledger.Ledger]
 	BaseLedger    fact.Fact[ledger.Ledger]
+	MarkLists     []MarkList
 }
 
 // Evaluator owns the rule identifiers, their evaluation order, and their
@@ -70,7 +82,13 @@ func (Evaluator) Evaluate(facts Facts) []Violation {
 }
 
 // order is the fixed rule evaluation order.
-var order = []func(Facts) []Violation{documentsExist, taskIDsUnchanged, singleTaskCompletion, agentsCanonical}
+var order = []func(Facts) []Violation{
+	documentsExist,
+	taskIDsUnchanged,
+	singleTaskCompletion,
+	noUnverified,
+	agentsCanonical,
+}
 
 func documentsExist(facts Facts) []Violation {
 	var violations []Violation
@@ -157,6 +175,37 @@ func newlyCompleteCount(facts Facts) (int, bool) {
 	}
 
 	return count, true
+}
+
+func noUnverified(facts Facts) []Violation {
+	count, ok := newlyCompleteCount(facts)
+	if !ok || count == 0 {
+		return nil
+	}
+
+	for _, list := range facts.MarkLists {
+		if list.Marks.IsFailed() {
+			return nil
+		}
+	}
+
+	var violations []Violation
+
+	for _, list := range facts.MarkLists {
+		if !list.Marks.IsPresent() {
+			continue
+		}
+
+		for _, m := range list.Marks.Value() {
+			violations = append(violations, Violation{
+				Rule:    RuleNoUnverified,
+				Path:    list.Path,
+				Message: fmt.Sprintf("UNVERIFIED mark on line %d", m.Line),
+			})
+		}
+	}
+
+	return violations
 }
 
 func agentsCanonical(facts Facts) []Violation {
