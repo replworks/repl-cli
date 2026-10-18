@@ -49,7 +49,7 @@
     - Failure behavior from ARCHITECTURE.md § Failure Boundaries (canonical text cannot be obtained or extracted) passes: when the canonical text cannot be obtained (simulated unreachable source), no file or directory is created, one error line is printed, and the exit code is 2. The same holds when the source contains no extractable canonical text.
     - Unit tests for the Init Coordinator, the Canonical Document Provider, and the Project Workspace pass.
 
-- [ ] T-006 Skip existing items with init
+- [X] T-006 Skip existing items with init
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-003, FR-006, FR-007); § User Interface / Commands (EL-001); § Acceptance Criteria (AC-002)
   - External boundary: yes
   - Acceptance criteria:
