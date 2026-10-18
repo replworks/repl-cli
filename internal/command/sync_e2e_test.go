@@ -75,6 +75,36 @@ func TestSyncAgainstTheLiveSourceReplacesADifferentAgentsMD(t *testing.T) {
 	}
 }
 
+func TestSyncAgainstTheLiveSourceReplacesADifferentLineEnding(t *testing.T) {
+	want := liveCanonical(t)
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(strings.ReplaceAll(want, "\n", "\r\n")), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	code, stdout, stderr := runCommand(t, nil, "sync")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if !strings.Contains(stdout, "- ") || !strings.Contains(stdout, "+ ") {
+		t.Fatalf("stdout = %q, want the difference lines", stdout)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("reading AGENTS.md: %v", err)
+	}
+	if string(content) != want {
+		t.Fatal("AGENTS.md does not hold the live canonical AGENTS.md")
+	}
+}
+
 func TestSyncAgainstTheLiveSourceKeepsAGENTSMDWhenTheSourceIsUnobtainable(t *testing.T) {
 	liveCanonical(t)
 

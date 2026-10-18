@@ -136,6 +136,132 @@ func TestSyncRejectsArguments(t *testing.T) {
 	}
 }
 
+func TestSyncTreatsALineEndingDifferenceAsDifferent(t *testing.T) {
+	local := strings.ReplaceAll(recordedText(t), "\n", "\r\n")
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(local), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "sync")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
+	}
+	if !strings.Contains(stdout, "- ") || !strings.Contains(stdout, "+ ") {
+		t.Fatalf("stdout = %q, want the difference lines", stdout)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("reading AGENTS.md: %v", err)
+	}
+	if string(content) != recordedText(t) {
+		t.Fatal("AGENTS.md does not hold the canonical AGENTS.md")
+	}
+}
+
+func TestSyncTreatsATrailingWhitespaceDifferenceAsDifferent(t *testing.T) {
+	local := strings.ReplaceAll(recordedText(t), "\n", " \n")
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(local), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "sync")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
+	}
+	if !strings.Contains(stdout, "- ") || !strings.Contains(stdout, "+ ") {
+		t.Fatalf("stdout = %q, want the difference lines", stdout)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("reading AGENTS.md: %v", err)
+	}
+	if string(content) != recordedText(t) {
+		t.Fatal("AGENTS.md does not hold the canonical AGENTS.md")
+	}
+}
+
+func TestSyncOutputsTheSameDifferenceAcrossRuns(t *testing.T) {
+	const local = "# local\n\nbody\n"
+
+	run := func() string {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(local), 0o644); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+		t.Chdir(dir)
+
+		client, _ := servePage(t, string(recordedPage(t)))
+
+		code, stdout, stderr := runCommand(t, client, "sync")
+		if code != 0 {
+			t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
+		}
+
+		return stdout
+	}
+
+	first, second := run(), run()
+
+	if first != second {
+		t.Fatalf("differences differ across runs:\nfirst:  %q\nsecond: %q", first, second)
+	}
+}
+
+func TestSyncReportsAReplacementFailureWithTheDifference(t *testing.T) {
+	dir := t.TempDir()
+	agents := filepath.Join(dir, "AGENTS.md")
+	if err := os.WriteFile(agents, []byte("# local\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	if err := os.Chmod(agents, 0o444); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chmod(agents, 0o644)
+	})
+
+	code, stdout, stderr := runCommand(t, client, "sync")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if !strings.Contains(stdout, "- # local") {
+		t.Fatalf("stdout = %q, want the difference lines", stdout)
+	}
+	if got := strings.Count(stdout, "repl: "); got != 1 {
+		t.Fatalf("stdout = %q, want one error line, got %d", stdout, got)
+	}
+
+	content, err := os.ReadFile(agents)
+	if err != nil {
+		t.Fatalf("reading AGENTS.md: %v", err)
+	}
+	if string(content) != "# local\n" {
+		t.Fatalf("AGENTS.md = %q, want the local content to be unchanged", content)
+	}
+}
+
 func TestRenderSync(t *testing.T) {
 	tests := []struct {
 		name       string
