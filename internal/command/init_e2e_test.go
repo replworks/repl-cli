@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -205,6 +206,43 @@ func TestInitAgainstTheLiveSourceWritesNothingWhenTheSourceIsUnobtainable(t *tes
 	}
 	if after := directoryState(t, dir); after != before {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+}
+
+func TestInitAgainstTheLiveSourceReportsAWriteFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a read-only directory does not prevent writes on Windows")
+	}
+
+	liveCanonical(t)
+
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chmod(dir, 0o755)
+	})
+
+	code, stdout, stderr := runInit(t, nil, "init")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if lines := errorLines(t, stdout); len(lines) != 1 {
+		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("reading the project directory: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("project directory holds %d entries, want none", len(entries))
 	}
 }
 
