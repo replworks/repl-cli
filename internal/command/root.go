@@ -69,6 +69,7 @@ func (r *runner) newRootCommand() *cobra.Command {
 	root.AddCommand(r.newStatusCommand())
 	root.AddCommand(r.newInitCommand())
 	root.AddCommand(r.newSyncCommand())
+	root.AddCommand(r.newCheckCommand())
 
 	return root
 }
