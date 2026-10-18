@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/replworks/repl-cli/internal/canon"
 	"github.com/replworks/repl-cli/internal/diff"
 	"github.com/replworks/repl-cli/internal/syncproject"
 )
@@ -24,6 +25,128 @@ func renderSyncOutcome(t *testing.T, outcome syncproject.Outcome) (int, string) 
 	cmd.SetOut(&buffer)
 
 	return renderSync(cmd, outcome), buffer.String()
+}
+
+func TestRenderSyncColorsDifferenceLinesForTerminalOutput(t *testing.T) {
+	var buffer bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&buffer)
+
+	code := renderSyncOutput(cmd, syncproject.Outcome{
+		Difference: []diff.Entry{
+			{Kind: diff.Removed, Line: "old"},
+			{Kind: diff.Added, Line: "new"},
+		},
+	}, true)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	want := "\x1b[31m- old\x1b[0m\n\x1b[32m+ new\x1b[0m\n"
+	if buffer.String() != want {
+		t.Fatalf("output = %q, want %q", buffer.String(), want)
+	}
+}
+
+func TestRenderSyncLeavesDifferenceLinesPlainForNonTerminalOutput(t *testing.T) {
+	var buffer bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&buffer)
+
+	renderSyncOutput(cmd, syncproject.Outcome{
+		Difference: []diff.Entry{
+			{Kind: diff.Removed, Line: "old"},
+			{Kind: diff.Added, Line: "new"},
+		},
+	}, false)
+
+	if got, want := buffer.String(), "- old\n+ new\n"; got != want {
+		t.Fatalf("output = %q, want %q", got, want)
+	}
+}
+
+func TestSyncUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("# stale\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	want := "# AGENTS.md\n\n## AUTO_RUN\n"
+	client, transport := servePage(t, want)
+
+	code, stdout, stderr := runCommandWithInput(t, client, "2\n", "sync")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("reading AGENTS.md: %v", err)
+	}
+	if string(content) != want {
+		t.Fatalf("AGENTS.md = %q, want %q", content, want)
+	}
+	requests := transport.requested()
+	if len(requests) != 1 || requests[0] != string(canon.AgentsAutoDocument) {
+		t.Fatalf("requests = %q, want one request to %q", requests, canon.AgentsAutoDocument)
+	}
+}
+
+func TestSyncRepeatsAfterAnInvalidDocumentSelection(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("# stale\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	want := "# AGENTS.md\n\n## AUTO_RUN\n"
+	client, _ := servePage(t, want)
+
+	code, stdout, stderr := runCommandWithInput(t, client, "3\n2\n", "sync")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "Invalid selection. Please enter 1 or 2.") {
+		t.Fatalf("stdout = %q, want the invalid-selection message", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+}
+
+func TestSyncFailsWithoutASelectionBeforeNetworkOrWrite(t *testing.T) {
+	dir := t.TempDir()
+	local := "# stale\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(local), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, transport := servePage(t, "# remote\n")
+
+	code, _, stderr := runCommandWithInput(t, client, "", "sync")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if !strings.Contains(stderr, "selection is required") {
+		t.Fatalf("stderr = %q, want the missing-selection error", stderr)
+	}
+	if got := transport.requested(); len(got) != 0 {
+		t.Fatalf("requests = %q, want none", got)
+	}
+	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("reading AGENTS.md: %v", err)
+	}
+	if string(content) != local {
+		t.Fatalf("AGENTS.md = %q, want unchanged %q", content, local)
+	}
 }
 
 func TestSyncReportsUpToDate(t *testing.T) {
@@ -111,8 +234,8 @@ func TestSyncFailsWhenTheCanonicalSourceIsUnavailable(t *testing.T) {
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
-	if lines := errorLines(t, stdout); len(lines) != 1 {
-		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
+	if count := strings.Count(stdout, "repl:"); count != 1 {
+		t.Fatalf("stdout has %d error lines (%q), want 1", count, stdout)
 	}
 	if after := directoryState(t, dir); after != before {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
@@ -236,8 +359,8 @@ func TestSyncFailsWithoutAGENTSMD(t *testing.T) {
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
-	if lines := errorLines(t, stdout); len(lines) != 1 {
-		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
+	if count := strings.Count(stdout, "repl:"); count != 1 {
+		t.Fatalf("stdout has %d error lines (%q), want 1", count, stdout)
 	}
 	if after := directoryState(t, dir); after != before {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
@@ -265,8 +388,8 @@ func TestSyncFailsWhenAGENTSCannotBeRead(t *testing.T) {
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
-	if lines := errorLines(t, stdout); len(lines) != 1 {
-		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
+	if count := strings.Count(stdout, "repl:"); count != 1 {
+		t.Fatalf("stdout has %d error lines (%q), want 1", count, stdout)
 	}
 	if after := directoryState(t, dir); after != before {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)

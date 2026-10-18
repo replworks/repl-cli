@@ -66,9 +66,10 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
   - Recognize the command and its options.
   - Reject an unknown command or option before any coordinator runs.
   - Resolve the base branch name for check (the given value, otherwise the default defined in PRODUCT_SPEC.md).
-  - For init, prompt for and validate the selected published AGENTS.md document.
+  - For init and sync, prompt for and validate the selected published AGENTS.md document.
   - Produce assistance output (usage help and similar) itself, without a coordinator.
   - Render each Outcome into output lines.
+  - Apply presentation colors to sync difference lines only when the output writer is a terminal.
   - Map each Outcome to an exit status.
 - Inputs: command-line arguments and, for init, the user's document selection.
 - Outputs: output lines, exit status, one Request to one Coordinator.
@@ -128,12 +129,12 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
 
 - Responsibilities:
   - Read the local AGENTS.md fact first. Record an execution error and stop when it is `Absent` or `Failed`.
-  - Only after that, obtain the Canonical Text. Record an execution error and stop when it is `Failed`.
+  - Only after that, obtain the Canonical Text for the selected sync document. Record an execution error and stop when it is `Failed`.
   - Compare local text and Canonical Text for exact equality.
   - When equal: return `UpToDate` and make no write.
   - When different: obtain the difference from the Difference Calculator, then replace the AGENTS.md content with the Canonical Text.
   - When replacement fails: keep the computed difference in the Outcome and record an execution error.
-- Inputs: Request (no options), local AGENTS.md fact, Canonical Text fact.
+- Inputs: Request with the selected document source, local AGENTS.md fact, Canonical Text fact.
 - Outputs: Outcome with `UpToDate | Replaced(difference) | ReplaceFailed(difference)`, and execution errors.
 - Ownership boundaries:
   - Owns the order of local check, retrieval, comparison, difference, replacement.
@@ -354,8 +355,9 @@ Request(base branch) → Check Coordinator
 ```text
 Request → Sync Coordinator
   Workspace Read(AGENTS.md) → fact
+  Command Interface → validated document selection
   [Absent | Failed] → Outcome(error), no write
-  Canonical Document Provider → Canonical Text fact
+  Canonical Document Provider(selection) → Canonical Text fact
   [Failed] → Outcome(error), no write
   exact comparison
     equal → Outcome(UpToDate)
@@ -377,6 +379,7 @@ Request → Sync Coordinator
 - status: complete count, total count, and first incomplete task ID or a no-incomplete-task indication.
 - check: violation lines first (Rule Evaluator order), then execution error lines (gathering order). A violation line contains rule identifier, file path, message. An error line contains the subject and message.
 - sync: an up-to-date indication, or the difference lines followed by any error line.
+- sync difference lines: removed lines are red and added lines are green for terminal output; non-terminal output is plain.
 - All paths printed are relative to the Project Directory.
 
 ## 8. Architectural Rules
@@ -399,7 +402,7 @@ Request → Sync Coordinator
 | Failure                                                       | Detected by                                 | Contained by       | Effect                                                                                                                  |
 | ------------------------------------------------------------- | ------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Unknown command or option                                     | Command Interface                           | Command Interface  | Error line, no coordinator runs, no file touched                                                                        |
-| Init input ends or fails before a valid document selection   | Command Interface                           | Command Interface  | Error line, exit 2, no coordinator runs, no file touched                                                               |
+| Init or sync input ends or fails before a valid selection    | Command Interface                           | Command Interface  | Error line, exit 2, no coordinator runs, no file touched                                                               |
 | Canonical Text cannot be obtained or extracted                | Canonical Document Provider                 | Coordinator in use | init and sync: stop, no write. check: agents-canonical not evaluated, other rules still run                             |
 | Project Directory not in a repository, or base branch missing | Base Branch Reader                          | Check Coordinator  | task-ids-unchanged, single-task-completion, no-unverified not evaluated. documents-exist and agents-canonical still run |
 | TASKS.md absent in working tree (check)                       | Project Workspace                           | Check Coordinator  | Not an error. The three ledger-dependent rules are not evaluated                                                        |
@@ -424,7 +427,7 @@ Request → Sync Coordinator
 - No rollback or transaction across multiple writes.
 - No automatic repair of rule violations by check.
 - No resolution or ranking of conflicts between documents.
-- No interactive prompting during an invocation except the required document selection for init.
+- No interactive prompting during an invocation except the required document selection for init and sync.
 - No pluggable output renderers or alternative output encodings.
 
 ## 11. Architectural Invariants
@@ -450,7 +453,7 @@ Each entry: ambiguity → decision → why.
 - RD-04: Duplicate task IDs and "absent or incomplete on base" are ambiguous → entries are counted individually, and an ID is complete in base when any base entry with that ID is complete; task-ids-unchanged compares distinct IDs → keeps counts per entry (status totals) while keeping ID identity stable across branches.
 - RD-05: Whether agents-canonical normalizes content is undefined → exact comparison with no normalization, also used by sync → confirmed by the user; matches "identical" in sync.
 - RD-06: The canonical source's representation is not defined by this architecture → the Canonical Document Provider hides the response representation and returns the exact response text; "cannot be obtained" includes an unsuccessful response or unavailable response → source-specific representation handling stays inside the provider.
-- RD-07: When the canonical text is retrieved is undefined → exactly once per invocation, using init's validated selection or the default document for sync and check, and always attempted by init, sync (after the local check), and check → ERR-001 requires an error line from check in every case where retrieval fails, so retrieval cannot be skipped.
+- RD-07: When the canonical text is retrieved is undefined → exactly once per invocation, using init's or sync's validated selection or the default document for check, and always attempted by init, sync (after the local check), and check → ERR-001 requires an error line from check in every case where retrieval fails, so retrieval cannot be skipped.
 - RD-08: init may meet an existing AGENTS.md while the canonical text is unobtainable → init obtains the Canonical Text first and writes nothing on failure, even when AGENTS.md already exists → ERR-001 applies unconditionally to init.
 - RD-09: sync with both an absent AGENTS.md and an unobtainable canonical source would produce two errors → the local check runs first and stops, so exactly one error line is produced and no network access is spent → keeps ERR-004 and ERR-001 each satisfied with one error line.
 - RD-10: Repository validity in check is only tied to TASKS.md → check always verifies repository and base branch validity, even when TASKS.md is absent in the working tree → confirmed by the user; ERR-002 is unconditional.

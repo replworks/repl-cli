@@ -2,6 +2,8 @@ package command
 
 import (
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -17,13 +19,18 @@ func (r *runner) newSyncCommand() *cobra.Command {
 		Long:  "sync compares AGENTS.md with the canonical AGENTS.md, prints the line-by-line difference, and replaces AGENTS.md with the canonical content when the contents differ.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			document, err := selectDocument(cmd)
+			if err != nil {
+				return err
+			}
+
 			dir, err := r.projectDir()
 			if err != nil {
 				return err
 			}
 
 			outcome := syncproject.Coordinator{
-				Source:     r.canonical(),
+				Source:     r.canonical(document),
 				Workspace:  workspace.GrantWrite(workspace.New(dir)),
 				Difference: diff.Calculator{},
 			}.Run()
@@ -35,6 +42,10 @@ func (r *runner) newSyncCommand() *cobra.Command {
 }
 
 func renderSync(cmd *cobra.Command, outcome syncproject.Outcome) int {
+	return renderSyncOutput(cmd, outcome, terminalOutput(cmd.OutOrStdout()))
+}
+
+func renderSyncOutput(cmd *cobra.Command, outcome syncproject.Outcome, color bool) int {
 	out := cmd.OutOrStdout()
 
 	if outcome.UpToDate {
@@ -45,10 +56,19 @@ func renderSync(cmd *cobra.Command, outcome syncproject.Outcome) int {
 
 	for _, entry := range outcome.Difference {
 		marker := "-"
+		colorCode := ""
+		resetCode := ""
 		if entry.Kind == diff.Added {
 			marker = "+"
 		}
-		_, _ = fmt.Fprintf(out, "%s %s\n", marker, entry.Line)
+		if color {
+			colorCode = "\x1b[31m"
+			resetCode = "\x1b[0m"
+			if entry.Kind == diff.Added {
+				colorCode = "\x1b[32m"
+			}
+		}
+		_, _ = fmt.Fprintf(out, "%s%s %s%s\n", colorCode, marker, entry.Line, resetCode)
 	}
 
 	if len(outcome.Errors) > 0 {
@@ -59,4 +79,14 @@ func renderSync(cmd *cobra.Command, outcome syncproject.Outcome) int {
 	}
 
 	return 0
+}
+
+func terminalOutput(writer io.Writer) bool {
+	file, ok := writer.(*os.File)
+	if !ok {
+		return false
+	}
+
+	info, err := file.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
