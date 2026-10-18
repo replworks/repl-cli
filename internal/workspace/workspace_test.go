@@ -60,8 +60,12 @@ func TestReadTextFailedWhenNotReadable(t *testing.T) {
 
 func TestReadTextRejectsPathsOutsideTheProjectDirectory(t *testing.T) {
 	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
 
-	for _, path := range []string{"../escape", "../../escape", "sub/../../escape", "/etc/hosts", ""} {
+	absolute := filepath.Join(dir, "AGENTS.md")
+	for _, path := range []string{"../escape", "../../escape", "sub/../../escape", "", absolute} {
 		t.Run(path, func(t *testing.T) {
 			got := New(dir).ReadText(path)
 			if !got.IsFailed() {
