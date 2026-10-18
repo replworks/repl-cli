@@ -2,17 +2,30 @@
 // identifiers, their fixed evaluation order, and their violation messages.
 package rule
 
-import "github.com/replworks/repl-cli/internal/fact"
+import (
+	"fmt"
+	"slices"
+
+	"github.com/replworks/repl-cli/internal/fact"
+	"github.com/replworks/repl-cli/internal/ledger"
+)
 
 // RuleDocumentsExist is reported for each authoritative document that does not
 // exist.
 const RuleDocumentsExist = "documents-exist"
 
+// RuleTaskIDsUnchanged is reported for each task ID that exists on the base
+// branch and does not exist in the working tree.
+const RuleTaskIDsUnchanged = "task-ids-unchanged"
+
 // RuleAgentsCanonical is reported for an AGENTS.md that differs from the
 // canonical AGENTS.md.
 const RuleAgentsCanonical = "agents-canonical"
 
-const agentsPath = "AGENTS.md"
+const (
+	agentsPath = "AGENTS.md"
+	tasksPath  = ".replworks/TASKS.md"
+)
 
 // Violation is a failed rule.
 type Violation struct {
@@ -29,10 +42,11 @@ type Document struct {
 
 // Facts is the bundle of facts that rule evaluation reads.
 type Facts struct {
-	Documents []Document
-	Agents    fact.Fact[string]
-	Canonical fact.Fact[string]
-	Base      fact.Fact[string]
+	Documents     []Document
+	Agents        fact.Fact[string]
+	Canonical     fact.Fact[string]
+	WorkingLedger fact.Fact[ledger.Ledger]
+	BaseLedger    fact.Fact[ledger.Ledger]
 }
 
 // Evaluator owns the rule identifiers, their evaluation order, and their
@@ -52,7 +66,7 @@ func (Evaluator) Evaluate(facts Facts) []Violation {
 }
 
 // order is the fixed rule evaluation order.
-var order = []func(Facts) []Violation{documentsExist, agentsCanonical}
+var order = []func(Facts) []Violation{documentsExist, taskIDsUnchanged, agentsCanonical}
 
 func documentsExist(facts Facts) []Violation {
 	var violations []Violation
@@ -66,6 +80,34 @@ func documentsExist(facts Facts) []Violation {
 			Rule:    RuleDocumentsExist,
 			Path:    document.Path,
 			Message: "document does not exist",
+		})
+	}
+
+	return violations
+}
+
+func taskIDsUnchanged(facts Facts) []Violation {
+	if !facts.WorkingLedger.IsPresent() || facts.BaseLedger.IsFailed() {
+		return nil
+	}
+
+	base := ledger.Ledger{}
+	if facts.BaseLedger.IsPresent() {
+		base = facts.BaseLedger.Value()
+	}
+
+	var violations []Violation
+	working := facts.WorkingLedger.Value().IDs
+
+	for _, id := range base.IDs {
+		if slices.Contains(working, id) {
+			continue
+		}
+
+		violations = append(violations, Violation{
+			Rule:    RuleTaskIDsUnchanged,
+			Path:    tasksPath,
+			Message: fmt.Sprintf("missing task ID %s", id),
 		})
 	}
 

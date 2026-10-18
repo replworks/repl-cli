@@ -527,3 +527,119 @@ func gitCommand(t *testing.T, dir string, args ...string) {
 		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, stderr.String())
 	}
 }
+
+func TestCheckReportsRemovedTaskIDs(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [ ] T-001 first\n- [ ] T-002 second\n- [ ] T-003 third\n")
+	initRepository(t, dir)
+	writeTasks(t, dir, "- [ ] T-001 first\n")
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{
+		"task-ids-unchanged .replworks/TASKS.md: missing task ID T-002",
+		"task-ids-unchanged .replworks/TASKS.md: missing task ID T-003",
+	}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+}
+
+func TestCheckDoesNotReportTaskIDsPresentInBoth(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [ ] T-001 first\n- [x] T-002 second\n")
+	initRepository(t, dir)
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+}
+
+func TestCheckDoesNotReportTaskIDsWithoutTasksOnTheBase(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	initRepository(t, dir)
+	writeTasks(t, dir, "- [ ] T-001 first\n")
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+}
+
+func TestCheckDoesNotReportTaskIDsWithoutTasksInTheWorkingTree(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [ ] T-001 first\n- [ ] T-002 second\n")
+	initRepository(t, dir)
+	if err := os.Remove(filepath.Join(dir, ".replworks", "TASKS.md")); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{"documents-exist .replworks/TASKS.md: document does not exist"}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func writeTasks(t *testing.T, dir, content string) {
+	t.Helper()
+
+	if err := os.MkdirAll(filepath.Join(dir, ".replworks"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".replworks", "TASKS.md"), []byte(content), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+}

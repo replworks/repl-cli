@@ -65,6 +65,17 @@ func coordinator(texts map[string]fact.Fact[string]) (Coordinator, *fakeWorkspac
 
 const baseBranch = "main"
 
+func presentDocuments(agents, tasks string) map[string]fact.Fact[string] {
+	texts := map[string]fact.Fact[string]{}
+	for _, path := range documents {
+		texts[path] = fact.Present("")
+	}
+	texts[agentsPath] = fact.Present(agents)
+	texts[tasksPath] = fact.Present(tasks)
+
+	return texts
+}
+
 func TestRunReadsEveryDocumentOnceInOrder(t *testing.T) {
 	coord, workspace := coordinator(nil)
 
@@ -99,12 +110,7 @@ func TestRunReportsMissingDocumentsInOrder(t *testing.T) {
 }
 
 func TestRunReportsNoViolationWhenEveryDocumentExists(t *testing.T) {
-	texts := map[string]fact.Fact[string]{}
-	for _, path := range documents {
-		texts[path] = fact.Present("")
-	}
-	texts[agentsPath] = fact.Present("# AGENTS.md\n")
-	coord, _ := coordinator(texts)
+	coord, _ := coordinator(presentDocuments("# AGENTS.md\n", ""))
 
 	outcome := coord.Run(baseBranch)
 
@@ -168,12 +174,7 @@ func TestRunObtainsTheCanonicalTextOnce(t *testing.T) {
 }
 
 func TestRunReportsADifferentAgentsMD(t *testing.T) {
-	texts := map[string]fact.Fact[string]{}
-	for _, path := range documents {
-		texts[path] = fact.Present("")
-	}
-	texts[agentsPath] = fact.Present("# local\n")
-	coord, _ := coordinator(texts)
+	coord, _ := coordinator(presentDocuments("# local\n", ""))
 
 	outcome := coord.Run(baseBranch)
 
@@ -189,12 +190,7 @@ func TestRunReportsADifferentAgentsMD(t *testing.T) {
 }
 
 func TestRunDoesNotReportAnIdenticalAgentsMD(t *testing.T) {
-	texts := map[string]fact.Fact[string]{}
-	for _, path := range documents {
-		texts[path] = fact.Present("")
-	}
-	texts[agentsPath] = fact.Present("# AGENTS.md\n")
-	coord, _ := coordinator(texts)
+	coord, _ := coordinator(presentDocuments("# AGENTS.md\n", ""))
 
 	outcome := coord.Run(baseBranch)
 
@@ -222,12 +218,7 @@ func TestRunDoesNotReportAnAbsentAgentsMD(t *testing.T) {
 
 func TestRunRecordsAFailedCanonicalTextAsAnError(t *testing.T) {
 	failure := errors.New("the canonical source is unreachable")
-	texts := map[string]fact.Fact[string]{}
-	for _, path := range documents {
-		texts[path] = fact.Present("")
-	}
-	texts[agentsPath] = fact.Present("# local\n")
-	coord, _ := coordinator(texts)
+	coord, _ := coordinator(presentDocuments("# local\n", ""))
 	coord.Source = &fakeSource{canonical: fact.Failed[string](failure)}
 
 	outcome := coord.Run(baseBranch)
@@ -257,12 +248,7 @@ func TestRunReadsTheBaseBranchOnce(t *testing.T) {
 
 func TestRunRecordsAFailedBaseBranchAsAnError(t *testing.T) {
 	failure := errors.New("the base branch main does not exist in the repository")
-	texts := map[string]fact.Fact[string]{}
-	for _, path := range documents {
-		texts[path] = fact.Present("")
-	}
-	texts[agentsPath] = fact.Present("# AGENTS.md\n")
-	coord, _ := coordinator(texts)
+	coord, _ := coordinator(presentDocuments("# AGENTS.md\n", ""))
 	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
 		baseBranch: fact.Failed[string](failure),
 	}}
@@ -282,10 +268,7 @@ func TestRunKeepsTheGatheringOrderOfErrors(t *testing.T) {
 	canonicalFailure := errors.New("the canonical source is unreachable")
 	baseFailure := errors.New("the base branch main does not exist in the repository")
 
-	texts := map[string]fact.Fact[string]{}
-	for _, path := range documents {
-		texts[path] = fact.Present("")
-	}
+	texts := presentDocuments("", "")
 	texts[".replworks/ARCHITECTURE.md"] = fact.Failed[string](readFailure)
 	coord, _ := coordinator(texts)
 	coord.Source = &fakeSource{canonical: fact.Failed[string](canonicalFailure)}
@@ -298,5 +281,70 @@ func TestRunKeepsTheGatheringOrderOfErrors(t *testing.T) {
 	want := []error{readFailure, canonicalFailure, baseFailure}
 	if !reflect.DeepEqual(outcome.Errors, want) {
 		t.Fatalf("errors = %v, want %v", outcome.Errors, want)
+	}
+}
+
+func TestRunReportsTaskIDsMissingFromTheWorkingTree(t *testing.T) {
+	coord, _ := coordinator(presentDocuments("# AGENTS.md\n", "- [ ] T-001 first\n"))
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [ ] T-001 first\n- [ ] T-002 second\n- [ ] T-003 third\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	want := []rule.Violation{
+		{Rule: rule.RuleTaskIDsUnchanged, Path: tasksPath, Message: "missing task ID T-002"},
+		{Rule: rule.RuleTaskIDsUnchanged, Path: tasksPath, Message: "missing task ID T-003"},
+	}
+	if !reflect.DeepEqual(outcome.Violations, want) {
+		t.Fatalf("violations = %v, want %v", outcome.Violations, want)
+	}
+	if len(outcome.Errors) != 0 {
+		t.Fatalf("errors = %v, want none", outcome.Errors)
+	}
+}
+
+func TestRunDoesNotReportTaskIDsWhenTheBaseHasNoTasks(t *testing.T) {
+	coord, _ := coordinator(presentDocuments("# AGENTS.md\n", "- [ ] T-001 first\n"))
+
+	outcome := coord.Run(baseBranch)
+
+	if len(outcome.Violations) != 0 {
+		t.Fatalf("violations = %v, want none", outcome.Violations)
+	}
+}
+
+func TestRunDoesNotReportTaskIDsWhenTheWorkingTreeHasNoTasks(t *testing.T) {
+	texts := presentDocuments("# AGENTS.md\n", "")
+	texts[tasksPath] = fact.Absent[string]()
+	coord, _ := coordinator(texts)
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [ ] T-001 first\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	want := []rule.Violation{
+		{Rule: rule.RuleDocumentsExist, Path: tasksPath, Message: "document does not exist"},
+	}
+	if !reflect.DeepEqual(outcome.Violations, want) {
+		t.Fatalf("violations = %v, want %v", outcome.Violations, want)
+	}
+}
+
+func TestRunDoesNotReportTaskIDsWhenTheBaseBranchFails(t *testing.T) {
+	failure := errors.New("the base branch main does not exist in the repository")
+	coord, _ := coordinator(presentDocuments("# AGENTS.md\n", "- [ ] T-001 first\n"))
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Failed[string](failure),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	if len(outcome.Violations) != 0 {
+		t.Fatalf("violations = %v, want none", outcome.Violations)
+	}
+	if len(outcome.Errors) != 1 || !errors.Is(outcome.Errors[0], failure) {
+		t.Fatalf("errors = %v, want the base branch failure", outcome.Errors)
 	}
 }

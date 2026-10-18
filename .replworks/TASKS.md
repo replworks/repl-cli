@@ -137,7 +137,7 @@
     - Given a base branch that does not exist, one error line is printed, the exit code is 2, and no line reports task-ids-unchanged, single-task-completion, or no-unverified.
     - Unit tests for the Base Branch Reader result handling pass.
 
-- [ ] T-014 Report removed task IDs with check
+- [X] T-014 Report removed task IDs with check
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-014, FR-022, FR-023); § User Interface / Commands (EL-003); § Acceptance Criteria (AC-008)
   - External boundary: yes
   - Acceptance criteria:

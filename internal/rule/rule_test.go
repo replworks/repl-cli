@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/replworks/repl-cli/internal/fact"
+	"github.com/replworks/repl-cli/internal/ledger"
 )
 
 func TestEvaluateReportsEveryAbsentDocumentInOrder(t *testing.T) {
@@ -134,20 +135,84 @@ func TestEvaluateReportsADifferentAgentsMD(t *testing.T) {
 	}
 }
 
-func TestEvaluateReportsDocumentsExistBeforeAgentsCanonical(t *testing.T) {
+func TestEvaluateReportsTaskIDsMissingFromTheWorkingTree(t *testing.T) {
+	facts := Facts{
+		WorkingLedger: fact.Present(ledger.New("- [ ] T-001 first\n- [ ] T-003 third\n")),
+		BaseLedger:    fact.Present(ledger.New("- [ ] T-001 first\n- [ ] T-002 second\n- [ ] T-003 third\n")),
+	}
+
+	got := Evaluator{}.Evaluate(facts)
+
+	want := []Violation{
+		{Rule: RuleTaskIDsUnchanged, Path: ".replworks/TASKS.md", Message: "missing task ID T-002"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("violations = %v, want %v", got, want)
+	}
+}
+
+func TestEvaluateReportsDistinctBaseTaskIDsInBaseOrder(t *testing.T) {
+	facts := Facts{
+		WorkingLedger: fact.Present(ledger.New("")),
+		BaseLedger:    fact.Present(ledger.New("- [ ] T-002 second\n- [ ] T-001 first\n- [ ] T-002 second again\n")),
+	}
+
+	got := Evaluator{}.Evaluate(facts)
+
+	want := []Violation{
+		{Rule: RuleTaskIDsUnchanged, Path: ".replworks/TASKS.md", Message: "missing task ID T-002"},
+		{Rule: RuleTaskIDsUnchanged, Path: ".replworks/TASKS.md", Message: "missing task ID T-001"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("violations = %v, want %v", got, want)
+	}
+}
+
+func TestEvaluateDoesNotReportTaskIDsForOtherLedgerStates(t *testing.T) {
+	base := fact.Present(ledger.New("- [ ] T-001 first\n"))
+	working := fact.Present(ledger.New("- [ ] T-001 first\n"))
+
+	tests := []struct {
+		name    string
+		working fact.Fact[ledger.Ledger]
+		base    fact.Fact[ledger.Ledger]
+	}{
+		{name: "same IDs", working: working, base: base},
+		{name: "empty base", base: fact.Present(ledger.New("")), working: working},
+		{name: "absent base", working: working, base: fact.Absent[ledger.Ledger]()},
+		{name: "failed base", working: working, base: fact.Failed[ledger.Ledger](errors.New("unreachable"))},
+		{name: "absent working ledger", working: fact.Absent[ledger.Ledger](), base: base},
+		{name: "failed working ledger", working: fact.Failed[ledger.Ledger](errors.New("permission denied")), base: base},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Evaluator{}.Evaluate(Facts{WorkingLedger: tt.working, BaseLedger: tt.base})
+
+			if len(got) != 0 {
+				t.Fatalf("violations = %v, want none", got)
+			}
+		})
+	}
+}
+
+func TestEvaluateReportsRulesInTheFixedOrder(t *testing.T) {
 	facts := Facts{
 		Documents: []Document{
 			{Path: "AGENTS.md", Text: fact.Present("# local\n")},
 			{Path: ".replworks/PRODUCT_SPEC.md", Text: fact.Absent[string]()},
 		},
-		Agents:    fact.Present("# local\n"),
-		Canonical: fact.Present("# AGENTS.md\n"),
+		Agents:        fact.Present("# local\n"),
+		Canonical:     fact.Present("# AGENTS.md\n"),
+		WorkingLedger: fact.Present(ledger.New("")),
+		BaseLedger:    fact.Present(ledger.New("- [ ] T-001 first\n")),
 	}
 
 	got := Evaluator{}.Evaluate(facts)
 
 	want := []Violation{
 		{Rule: RuleDocumentsExist, Path: ".replworks/PRODUCT_SPEC.md", Message: "document does not exist"},
+		{Rule: RuleTaskIDsUnchanged, Path: ".replworks/TASKS.md", Message: "missing task ID T-001"},
 		{Rule: RuleAgentsCanonical, Path: "AGENTS.md", Message: "AGENTS.md differs from the canonical AGENTS.md"},
 	}
 
