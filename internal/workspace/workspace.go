@@ -36,6 +36,22 @@ func (w Workspace) ReadText(rel string) fact.Fact[string] {
 	return fact.Present(string(content))
 }
 
+func (w Workspace) Exists(rel string) fact.Fact[bool] {
+	abs, err := w.resolve(rel)
+	if err != nil {
+		return fact.Failed[bool](err)
+	}
+
+	if _, err := os.Lstat(abs); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return fact.Present(false)
+		}
+		return fact.Failed[bool](fmt.Errorf("checking %s: %w", rel, err))
+	}
+
+	return fact.Present(true)
+}
+
 func (w Workspace) resolve(rel string) (string, error) {
 	if rel == "" {
 		return "", errors.New("path is empty")

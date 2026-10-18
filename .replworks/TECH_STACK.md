@@ -2,7 +2,7 @@
 
 ## 1. Languages / runtimes / frameworks / libraries
 
-- Go >= 1.24. go.mod MUST declare `go 1.24`.
+- Go >= 1.26. go.mod MUST declare the Go version required by the dependencies.
 - Module path MUST be `github.com/replworks/repl-cli`.
 - Dependency manager: Go modules. go.mod and go.sum MUST be committed.
 - github.com/spf13/cobra v1.x. MUST implement every command.
@@ -75,6 +75,7 @@
   - `go test ./...`
 - GitHub Actions MUST run the verification commands on ubuntu, macOS, and Windows.
 - GitHub Actions MUST read the Go version from go.mod.
+- GitHub Actions MUST install the newest patch release of the major.minor version read from go.mod.
 - GitHub Actions MUST run `govulncheck ./...`.
 - Releases MUST be created from git tags `vMAJOR.MINOR.PATCH`.
 - GoReleaser MUST build binaries for darwin, linux, and windows, each on amd64 and arm64.
