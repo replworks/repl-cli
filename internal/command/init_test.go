@@ -97,7 +97,7 @@ func servePage(t *testing.T, page string) (*http.Client, *recordingTransport) {
 	return &http.Client{Transport: transport}, transport
 }
 
-func runInit(t *testing.T, client *http.Client, args ...string) (int, string, string) {
+func runCommand(t *testing.T, client *http.Client, args ...string) (int, string, string) {
 	t.Helper()
 
 	var stdout, stderr bytes.Buffer
@@ -119,7 +119,7 @@ func TestInitCreatesAgentsAndReplworks(t *testing.T) {
 
 	client, transport := servePage(t, string(recordedPage(t)))
 
-	code, stdout, stderr := runInit(t, client, "init")
+	code, stdout, stderr := runCommand(t, client, "init")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
@@ -184,7 +184,7 @@ func TestInitLeavesExistingEntriesUnchanged(t *testing.T) {
 	client, _ := servePage(t, string(recordedPage(t)))
 	before := directoryState(t, dir)
 
-	code, stdout, stderr := runInit(t, client, "init")
+	code, stdout, stderr := runCommand(t, client, "init")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
@@ -209,7 +209,7 @@ func TestInitCreatesTheMissingEntryOnly(t *testing.T) {
 
 	client, _ := servePage(t, string(recordedPage(t)))
 
-	code, stdout, stderr := runInit(t, client, "init")
+	code, stdout, stderr := runCommand(t, client, "init")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
@@ -245,7 +245,7 @@ func TestInitFailsWhenTheCanonicalSourceIsUnavailable(t *testing.T) {
 
 	before := directoryState(t, dir)
 
-	code, stdout, stderr := runInit(t, client, "init")
+	code, stdout, stderr := runCommand(t, client, "init")
 
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2", code)
@@ -275,7 +275,7 @@ func TestInitFailsWithoutAnExtractableCanonicalText(t *testing.T) {
 
 	before := directoryState(t, dir)
 
-	code, stdout, stderr := runInit(t, client, "init")
+	code, stdout, stderr := runCommand(t, client, "init")
 
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2", code)
@@ -305,7 +305,7 @@ func TestInitSkipsEntriesOfAnyKind(t *testing.T) {
 	client, _ := servePage(t, string(recordedPage(t)))
 	before := directoryState(t, dir)
 
-	code, stdout, stderr := runInit(t, client, "init")
+	code, stdout, stderr := runCommand(t, client, "init")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
@@ -396,7 +396,7 @@ func TestInitRejectsArguments(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 
-	code, stdout, stderr := runInit(t, nil, "init", "AGENTS.md")
+	code, stdout, stderr := runCommand(t, nil, "init", "AGENTS.md")
 
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2", code)

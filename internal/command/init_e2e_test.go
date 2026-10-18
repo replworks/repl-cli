@@ -33,7 +33,7 @@ func TestInitAgainstTheLiveSource(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 
-	code, stdout, stderr := runInit(t, nil, "init")
+	code, stdout, stderr := runCommand(t, nil, "init")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
@@ -83,7 +83,7 @@ func TestInitAgainstTheLiveSourceKeepsAnExistingAgentsMD(t *testing.T) {
 	}
 	t.Chdir(dir)
 
-	code, stdout, stderr := runInit(t, nil, "init")
+	code, stdout, stderr := runCommand(t, nil, "init")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
@@ -120,7 +120,7 @@ func TestInitAgainstTheLiveSourceCreatesAGENTSMDWhenReplworksExists(t *testing.T
 	}
 	t.Chdir(dir)
 
-	code, stdout, stderr := runInit(t, nil, "init")
+	code, stdout, stderr := runCommand(t, nil, "init")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
@@ -161,7 +161,7 @@ func TestInitAgainstTheLiveSourceSkipsBothExistingItems(t *testing.T) {
 
 	before := directoryState(t, dir)
 
-	code, stdout, stderr := runInit(t, nil, "init")
+	code, stdout, stderr := runCommand(t, nil, "init")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
@@ -193,7 +193,7 @@ func TestInitAgainstTheLiveSourceWritesNothingWhenTheSourceIsUnobtainable(t *tes
 
 	client := &http.Client{Transport: &recordingTransport{target: "http://127.0.0.1:1"}}
 
-	code, stdout, stderr := runInit(t, client, "init")
+	code, stdout, stderr := runCommand(t, client, "init")
 
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2", code)
@@ -225,7 +225,7 @@ func TestInitAgainstTheLiveSourceReportsAWriteFailure(t *testing.T) {
 		_ = os.Chmod(dir, 0o755)
 	})
 
-	code, stdout, stderr := runInit(t, nil, "init")
+	code, stdout, stderr := runCommand(t, nil, "init")
 
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2", code)
