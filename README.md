@@ -54,6 +54,22 @@ make fmt            # go fmt ./...
 make check          # gofmt check, go vet, go test ./...
 ```
 
+Run the local build from a scratch directory, so a command never changes this
+repository's own documents. `make build` writes the `repl` binary to the
+repository root (it is excluded from version control), and `sample/` is a
+scratch project directory tracked in this repository whose `.gitignore`
+excludes everything it creates:
+
+```sh
+make build
+cd sample
+../repl init      # writes sample/AGENTS.md and sample/.replworks/
+../repl sync
+```
+
+`status` and `check` read `.replworks/TASKS.md`, so create it in the scratch
+directory when you exercise those commands.
+
 The default test suite needs no network access, no external service, and no
 manual interaction, but it does run the local `git` executable. Tests that
 contact the canonical source and real repositories carry the `e2e` build tag
