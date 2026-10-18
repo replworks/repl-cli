@@ -287,6 +287,38 @@ func TestInitFailsWithoutAnExtractableCanonicalText(t *testing.T) {
 	}
 }
 
+func TestInitSkipsEntriesOfAnyKind(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "AGENTS.md"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".replworks"), []byte("not a directory\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runInit(t, client, "init")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+
+	for _, want := range []string{"skipped: AGENTS.md", "skipped: .replworks"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("stdout = %q, want it to contain %q", stdout, want)
+		}
+	}
+}
+
 func TestInitRejectsArguments(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
