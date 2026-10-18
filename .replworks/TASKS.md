@@ -214,7 +214,7 @@
     - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: a path outside the project directory is rejected by the Project Workspace and no file outside is touched.
     - Unit tests for the Project Workspace path confinement pass.
 
-- [ ] T-020 Limit network access to the canonical source
+- [X] T-020 Limit network access to the canonical source
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / all commands (FR-033); § Acceptance Criteria (AC-031)
   - External boundary: yes
   - Acceptance criteria:
