@@ -54,17 +54,16 @@ make fmt            # go fmt ./...
 make check          # gofmt check, go vet, go test ./...
 ```
 
-Run the local build from a scratch directory, so a command never changes this
-repository's own documents. `make build` writes the `repl` binary to the
-repository root (it is excluded from version control), and `sample/` is a
-scratch project directory tracked in this repository whose `.gitignore`
-excludes everything it creates:
+Run the local build from a scratch directory outside this repository, so a
+command never changes the repository's own documents. `make build` writes the
+`repl` binary to the repository root (it is excluded from version control):
 
 ```sh
 make build
-cd sample
-../repl init      # writes sample/AGENTS.md and sample/.replworks/
-../repl sync
+scratch_dir=$(mktemp -d)
+cd "$scratch_dir"
+/path/to/repl-cli/repl init
+/path/to/repl-cli/repl sync
 ```
 
 `status` and `check` read `.replworks/TASKS.md`, so create it in the scratch
