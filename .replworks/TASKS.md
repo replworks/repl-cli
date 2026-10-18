@@ -71,7 +71,7 @@
     - Given AGENTS.md created and a simulated write failure while creating `.replworks/`, AGENTS.md remains and is reported as created, one error line is printed, and the exit code is 2.
     - Unit tests for the Init Coordinator write-failure handling pass.
 
-- [ ] T-008 Report an up-to-date AGENTS.md with sync
+- [X] T-008 Report an up-to-date AGENTS.md with sync
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / sync (FR-027, FR-028, FR-031); § User Interface / Commands (EL-005); § Acceptance Criteria (AC-020, AC-023)
   - External boundary: yes
   - Acceptance criteria:
