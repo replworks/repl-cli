@@ -5,10 +5,14 @@ import (
 	"errors"
 
 	"github.com/replworks/repl-cli/internal/fact"
+	"github.com/replworks/repl-cli/internal/ledger"
 	"github.com/replworks/repl-cli/internal/rule"
 )
 
-const agentsPath = "AGENTS.md"
+const (
+	agentsPath = "AGENTS.md"
+	tasksPath  = ".replworks/TASKS.md"
+)
 
 // documents are the authoritative documents, in the order they are read.
 var documents = []string{
@@ -16,7 +20,7 @@ var documents = []string{
 	".replworks/PRODUCT_SPEC.md",
 	".replworks/TECH_STACK.md",
 	".replworks/ARCHITECTURE.md",
-	".replworks/TASKS.md",
+	tasksPath,
 }
 
 // Workspace is the project directory with the Read capability.
@@ -53,7 +57,7 @@ type Coordinator struct {
 // working tree.
 func (c Coordinator) Run(branch string) Outcome {
 	gathered := make([]rule.Document, 0, len(documents))
-	var agents fact.Fact[string]
+	var agents, tasks fact.Fact[string]
 	var errors []error
 
 	for _, path := range documents {
@@ -61,8 +65,11 @@ func (c Coordinator) Run(branch string) Outcome {
 		if text.IsFailed() {
 			errors = append(errors, text.Reason())
 		}
-		if path == agentsPath {
+		switch path {
+		case agentsPath:
 			agents = text
+		case tasksPath:
+			tasks = text
 		}
 		gathered = append(gathered, rule.Document{Path: path, Text: text})
 	}
@@ -79,12 +86,24 @@ func (c Coordinator) Run(branch string) Outcome {
 
 	return Outcome{
 		Violations: c.Evaluator.Evaluate(rule.Facts{
-			Documents: gathered,
-			Agents:    agents,
-			Canonical: canonical,
-			Base:      base,
+			Documents:     gathered,
+			Agents:        agents,
+			Canonical:     canonical,
+			WorkingLedger: ledgerFact(tasks),
+			BaseLedger:    ledgerFact(base),
 		}),
 		Errors: errors,
+	}
+}
+
+func ledgerFact(text fact.Fact[string]) fact.Fact[ledger.Ledger] {
+	switch {
+	case text.IsPresent():
+		return fact.Present(ledger.New(text.Value()))
+	case text.IsFailed():
+		return fact.Failed[ledger.Ledger](text.Reason())
+	default:
+		return fact.Absent[ledger.Ledger]()
 	}
 }
 

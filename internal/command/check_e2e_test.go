@@ -356,3 +356,59 @@ func TestCheckOutsideARepositoryReportsTheRepositoryErrorAlone(t *testing.T) {
 		t.Fatalf("line 1 = %q, want the repository error", lines[0])
 	}
 }
+
+func TestCheckAgainstTheLiveRepositoryReportsRemovedTaskIDs(t *testing.T) {
+	want := liveCanonical(t)
+
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	writeDocuments(t, sub, want)
+	writeTasks(t, sub, "- [ ] T-001 first\n- [ ] T-002 second\n- [ ] T-003 third\n")
+	initRepository(t, dir)
+	writeTasks(t, sub, "- [ ] T-001 first\n- [x] T-003 third\n")
+	t.Chdir(sub)
+
+	client, _ := liveRecordingClient()
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want2 := []string{"task-ids-unchanged .replworks/TASKS.md: missing task ID T-002"}
+	if !reflect.DeepEqual(lines, want2) {
+		t.Fatalf("stdout = %q, want %q", stdout, want2)
+	}
+}
+
+func TestCheckAgainstTheLiveRepositoryReportsNoRemovedTaskIDs(t *testing.T) {
+	want := liveCanonical(t)
+
+	dir := t.TempDir()
+	writeDocuments(t, dir, want)
+	writeTasks(t, dir, "- [ ] T-001 first\n- [x] T-002 second\n")
+	initRepository(t, dir)
+	t.Chdir(dir)
+
+	client, _ := liveRecordingClient()
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want no line", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+}

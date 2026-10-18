@@ -3,6 +3,7 @@
 package ledger
 
 import (
+	"slices"
 	"strings"
 	"unicode"
 
@@ -13,6 +14,7 @@ type Ledger struct {
 	Total             int
 	Complete          int
 	FirstIncompleteID string
+	IDs               []string
 }
 
 func New(text string) Ledger {
@@ -25,6 +27,7 @@ func New(text string) Ledger {
 		}
 
 		led.Total++
+		led.addID(id)
 		if complete {
 			led.Complete++
 			continue
@@ -35,6 +38,14 @@ func New(text string) Ledger {
 	}
 
 	return led
+}
+
+func (l *Ledger) addID(id string) {
+	if slices.Contains(l.IDs, id) {
+		return
+	}
+
+	l.IDs = append(l.IDs, id)
 }
 
 func parseEntry(line docline.Line) (string, bool, bool) {

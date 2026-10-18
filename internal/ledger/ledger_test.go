@@ -20,11 +20,40 @@ func TestNewDerivations(t *testing.T) {
 	if led.FirstIncompleteID != "T-003" {
 		t.Fatalf("FirstIncompleteID = %q, want %q", led.FirstIncompleteID, "T-003")
 	}
+	assertIDs(t, led, "T-001", "T-002", "T-003", "T-004", "T-005")
+}
+
+func TestNewKeepsDistinctIDsInOrder(t *testing.T) {
+	text := "" +
+		"- [X] T-002 second\n" +
+		"- [ ] T-001 first\n" +
+		"- [ ] T-002 second again\n" +
+		"- [ ] T-001 first again\n"
+
+	led := New(text)
+
+	assertIDs(t, led, "T-002", "T-001")
+	if led.Total != 4 || led.Complete != 1 {
+		t.Fatalf("ledger = %+v, want 4 entries and 1 complete", led)
+	}
+}
+
+func assertIDs(t *testing.T, led Ledger, want ...string) {
+	t.Helper()
+
+	if len(led.IDs) != len(want) {
+		t.Fatalf("IDs = %q, want %q", led.IDs, want)
+	}
+	for i, id := range want {
+		if led.IDs[i] != id {
+			t.Fatalf("IDs = %q, want %q", led.IDs, want)
+		}
+	}
 }
 
 func TestNewEmptyLedger(t *testing.T) {
 	led := New("")
-	if led.Total != 0 || led.Complete != 0 || led.FirstIncompleteID != "" {
+	if led.Total != 0 || led.Complete != 0 || led.FirstIncompleteID != "" || len(led.IDs) != 0 {
 		t.Fatalf("New(\"\") = %+v, want an empty ledger", led)
 	}
 }
