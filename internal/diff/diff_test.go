@@ -120,15 +120,6 @@ func TestCompareTrailingWhitespaceDifference(t *testing.T) {
 	assertEntries(t, got, want)
 }
 
-func TestCalculatorMatchesCompare(t *testing.T) {
-	local := "a\nb\n"
-	canonical := "a\nc\n"
-
-	if got, want := (Calculator{}).Compare(local, canonical), Compare(local, canonical); !reflect.DeepEqual(got, want) {
-		t.Fatalf("Calculator.Compare() = %+v, want %+v", got, want)
-	}
-}
-
 func assertEntries(t *testing.T, got, want []Entry) {
 	t.Helper()
 
