@@ -8,7 +8,7 @@
     - Every verification command defined in TECH_STACK.md passes.
     - The product builds and starts as a command-line program on the development platform.
 
-- [ ] T-002 Reject an unknown command or option
+- [X] T-002 Reject an unknown command or option
   - Satisfies: PRODUCT_SPEC.md § Error Conditions (ERR-005); § Acceptance Criteria (AC-029, AC-030)
   - External boundary: no
   - Acceptance criteria:
