@@ -532,3 +532,65 @@ func TestRunDoesNotReportMarksInAgentsOrTasks(t *testing.T) {
 		t.Fatalf("errors = %v, want none", outcome.Errors)
 	}
 }
+
+func TestRunRecordsAnUnreadableTasksAsAnError(t *testing.T) {
+	readFailure := errors.New("reading .replworks/TASKS.md: permission denied")
+	texts := presentDocuments("# AGENTS.md\n", "")
+	texts[tasksPath] = fact.Failed[string](readFailure)
+	texts[architecture] = fact.Present("## 1. Purpose [UNVERIFIED]\n")
+	coord, _ := coordinator(texts)
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [ ] T-001 first\n- [x] T-002 second\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	if len(outcome.Violations) != 0 {
+		t.Fatalf("violations = %v, want none: an unreadable TASKS.md disables the task rules and is not missing", outcome.Violations)
+	}
+	if len(outcome.Errors) != 1 || !errors.Is(outcome.Errors[0], readFailure) {
+		t.Fatalf("errors = %v, want the read failure", outcome.Errors)
+	}
+}
+
+func TestRunRecordsAnUnreadableAgentsAsAnError(t *testing.T) {
+	readFailure := errors.New("reading AGENTS.md: permission denied")
+	texts := presentDocuments("", "- [x] T-001 first\n")
+	texts[agentsPath] = fact.Failed[string](readFailure)
+	texts[architecture] = fact.Present("## 1. Purpose [UNVERIFIED]\n")
+	coord, _ := coordinator(texts)
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [ ] T-001 first\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	want := []rule.Violation{
+		{Rule: rule.RuleNoUnverified, Path: architecture, Message: "UNVERIFIED mark on line 1"},
+	}
+	if !reflect.DeepEqual(outcome.Violations, want) {
+		t.Fatalf("violations = %v, want %v: an unreadable AGENTS.md disables agents-canonical only", outcome.Violations, want)
+	}
+	if len(outcome.Errors) != 1 || !errors.Is(outcome.Errors[0], readFailure) {
+		t.Fatalf("errors = %v, want the read failure", outcome.Errors)
+	}
+}
+
+func TestRunRecordsAnUnreadableMarkDocumentAsAnError(t *testing.T) {
+	readFailure := errors.New("reading .replworks/TECH_STACK.md: permission denied")
+	texts := presentDocuments("# AGENTS.md\n", "- [x] T-001 first\n")
+	texts[techStackPath] = fact.Failed[string](readFailure)
+	coord, _ := coordinator(texts)
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [ ] T-001 first\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	if len(outcome.Violations) != 0 {
+		t.Fatalf("violations = %v, want none: a failed mark list disables no-unverified", outcome.Violations)
+	}
+	if len(outcome.Errors) != 1 || !errors.Is(outcome.Errors[0], readFailure) {
+		t.Fatalf("errors = %v, want the read failure", outcome.Errors)
+	}
+}
