@@ -117,6 +117,15 @@ func TestCanonicalFromTheRecordedPage(t *testing.T) {
 	}
 }
 
+func TestRecordedTestdataIsByteExact(t *testing.T) {
+	if text := recordedText(t); strings.Contains(text, "\r") {
+		t.Fatal("the recorded canonical text holds carriage returns: testdata must be checked out byte-exact (see .gitattributes)")
+	}
+	if page := string(recordedPage(t)); strings.Contains(page, "\r\n") {
+		t.Fatal("the recorded page holds carriage returns: testdata must be checked out byte-exact (see .gitattributes)")
+	}
+}
+
 func TestCanonicalRequestsOnlyTheCanonicalSource(t *testing.T) {
 	client, transport := servePage(t, string(recordedPage(t)))
 
