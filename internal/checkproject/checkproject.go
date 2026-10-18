@@ -29,6 +29,11 @@ type CanonicalSource interface {
 	Canonical() fact.Fact[string]
 }
 
+// BaseBranchReader provides the TASKS.md of the base branch.
+type BaseBranchReader interface {
+	Tasks(branch string) fact.Fact[string]
+}
+
 // Outcome reports the result of one check invocation.
 type Outcome struct {
 	Violations []rule.Violation
@@ -38,12 +43,15 @@ type Outcome struct {
 type Coordinator struct {
 	Workspace Workspace
 	Source    CanonicalSource
+	Bases     BaseBranchReader
 	Evaluator rule.Evaluator
 }
 
 // Run reads every authoritative document once, in order, obtains the canonical
-// text, and evaluates the rules over the gathered facts.
-func (c Coordinator) Run() Outcome {
+// text, reads the base TASKS.md, and evaluates the rules over the gathered
+// facts. The base branch is always read, even when TASKS.md is absent in the
+// working tree.
+func (c Coordinator) Run(branch string) Outcome {
 	gathered := make([]rule.Document, 0, len(documents))
 	var agents fact.Fact[string]
 	var errors []error
@@ -64,11 +72,17 @@ func (c Coordinator) Run() Outcome {
 		errors = append(errors, canonicalReason(canonical))
 	}
 
+	base := c.Bases.Tasks(branch)
+	if base.IsFailed() {
+		errors = append(errors, base.Reason())
+	}
+
 	return Outcome{
 		Violations: c.Evaluator.Evaluate(rule.Facts{
 			Documents: gathered,
 			Agents:    agents,
 			Canonical: canonical,
+			Base:      base,
 		}),
 		Errors: errors,
 	}
