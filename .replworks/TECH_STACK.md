@@ -6,7 +6,7 @@
 - Module path MUST be `github.com/replworks/repl-cli`.
 - Dependency manager: Go modules. go.mod and go.sum MUST be committed.
 - github.com/spf13/cobra v1.x. MUST implement every command.
-- golang.org/x/net/html v0.x. MUST parse the HTML page that serves the canonical AGENTS.md.
+- Canonical documents MUST be retrieved as unmodified response text over HTTPS with the standard-library `net/http` client. The provider MUST support the two published Markdown document URLs defined in PRODUCT_SPEC.md.
 - github.com/aymanbagabas/go-udiff v0.x. MUST produce line-by-line diffs.
 - Go standard library MUST be used for: net/http, log/slog, os/exec, bufio, regexp, testing, net/http/httptest.
 - `git` executable, invoked through os/exec. MUST read TASKS.md from the base branch.
