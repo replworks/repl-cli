@@ -160,29 +160,33 @@ func TestInitUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
 	}
 }
 
-func TestInitRejectsAnInvalidDocumentSelectionWithoutNetworkOrWrites(t *testing.T) {
+func TestInitRepeatsAfterAnInvalidDocumentSelection(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 
-	client, transport := servePage(t, "# AGENTS.md\n")
-	before := directoryState(t, dir)
+	want := "# AGENTS.md\n\n## AUTO_RUN\n"
+	client, transport := servePage(t, want)
 
-	code, stdout, stderr := runCommandWithInput(t, client, "3\n", "init")
+	code, stdout, stderr := runCommandWithInput(t, client, "3\n2\n", "init")
 
-	if code != 2 {
-		t.Fatalf("exit code = %d, want 2", code)
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
 	}
-	if stdout == "" || !strings.Contains(stdout, "Choice [1-2]:") {
-		t.Fatalf("stdout = %q, want the selection prompt", stdout)
+	if !strings.Contains(stdout, "Invalid selection. Please enter 1 or 2.") {
+		t.Fatalf("stdout = %q, want the invalid-selection message", stdout)
 	}
-	if stderr == "" || !strings.Contains(stderr, "must be 1 or 2") {
-		t.Fatalf("stderr = %q, want the selection error", stderr)
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
 	}
-	if got := transport.requested(); len(got) != 0 {
-		t.Fatalf("requests = %q, want none", got)
+	if got := transport.requested(); len(got) != 1 || got[0] != string(canon.AgentsAutoDocument) {
+		t.Fatalf("requests = %q, want one request to %q", got, canon.AgentsAutoDocument)
 	}
-	if after := directoryState(t, dir); after != before {
-		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("reading AGENTS.md: %v", err)
+	}
+	if string(content) != want {
+		t.Fatalf("AGENTS.md = %q, want %q", content, want)
 	}
 }
 

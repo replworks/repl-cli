@@ -43,27 +43,29 @@ func (r *runner) newInitCommand() *cobra.Command {
 
 func selectInitDocument(cmd *cobra.Command) (canon.Document, error) {
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintln(out, "Select an AGENTS.md document:")
-	_, _ = fmt.Fprintf(out, "1) %s\n", canon.AgentsDocument)
-	_, _ = fmt.Fprintf(out, "2) %s\n", canon.AgentsAutoDocument)
-	_, _ = fmt.Fprintln(out, "Choice [1-2]:")
-
 	scanner := bufio.NewScanner(cmd.InOrStdin())
-	if !scanner.Scan() {
-		if err := scanner.Err(); err != nil {
-			return "", fmt.Errorf("reading the init document selection: %w", err)
+	for {
+		_, _ = fmt.Fprintln(out, "Select an AGENTS.md document:")
+		_, _ = fmt.Fprintf(out, "1) %s\n", canon.AgentsDocument)
+		_, _ = fmt.Fprintf(out, "2) %s\n", canon.AgentsAutoDocument)
+		_, _ = fmt.Fprintln(out, "Choice [1-2]:")
+
+		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				return "", fmt.Errorf("reading the init document selection: %w", err)
+			}
+
+			return "", errors.New("an init document selection is required")
 		}
 
-		return "", errors.New("an init document selection is required")
-	}
-
-	switch strings.TrimSpace(scanner.Text()) {
-	case "1":
-		return canon.AgentsDocument, nil
-	case "2":
-		return canon.AgentsAutoDocument, nil
-	default:
-		return "", errors.New("the init document selection must be 1 or 2")
+		switch strings.TrimSpace(scanner.Text()) {
+		case "1":
+			return canon.AgentsDocument, nil
+		case "2":
+			return canon.AgentsAutoDocument, nil
+		default:
+			_, _ = fmt.Fprintln(out, "Invalid selection. Please enter 1 or 2.")
+		}
 	}
 }
 

@@ -198,7 +198,7 @@
   - repl-cli MUST NOT modify any file.
   - repl-cli MUST print an error line.
   - repl-cli MUST exit with code 2.
-- ERR-006: The user does not select one of the two init documents.
+- ERR-006: The init input ends or fails before the user selects one of the two init documents.
   - repl init MUST NOT create or modify any file.
   - repl init MUST print an error line.
   - repl init MUST exit with code 2.
@@ -244,4 +244,5 @@
 - AC-031: Given any command, when it runs, then no network request is sent to any address other than the two published document URLs, and init requests only the selected URL. (FR-033)
 - AC-032: Given repl status or repl check, when it runs, then no file is created, modified, or deleted. (FR-012, FR-019, FR-034)
 - AC-033: Given an empty directory and a valid selection of `https://www.repl.net/documents/agents-auto.md`, when repl init runs, then AGENTS.md exists with that document's exact content, the .replworks/ directory exists, and the exit code is 0. (FR-001, FR-002, FR-005, FR-007, EL-001)
-- AC-034: Given an empty directory and an invalid or missing init selection, when repl init runs, then no file is created or modified, an error line is printed, and the exit code is 2. (ERR-006, EL-001)
+- AC-034: Given an empty directory and an invalid init selection followed by a valid selection, when repl init runs, then repl init presents the choices again, creates the selected document, and exits with code 0. (FR-001, FR-002, EL-001)
+- AC-035: Given an empty directory and an init input that ends before a valid selection, when repl init runs, then no file is created or modified, an error line is printed, and the exit code is 2. (ERR-006, EL-001)

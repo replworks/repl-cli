@@ -226,13 +226,14 @@
     - Unit tests for the Canonical Document Provider request behavior pass.
 
 - [X] T-021 Select the AGENTS.md document during init
-  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-001 through FR-007); § Error Conditions (ERR-006); § Acceptance Criteria (AC-001, AC-002, AC-003, AC-022, AC-033, AC-034); ARCHITECTURE.md § Components (C1, C2, C7)
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-001 through FR-007); § Error Conditions (ERR-006); § Acceptance Criteria (AC-001, AC-002, AC-003, AC-022, AC-033, AC-034, AC-035); ARCHITECTURE.md § Components (C1, C2, C7)
   - External boundary: yes
   - Acceptance criteria:
     - The live behavior of both published Markdown URLs is observed.
     - `repl init` presents exactly two choices in the documented order and accepts a valid selection.
     - An E2E test exercises init with each selection against the live URLs. In an empty directory, AGENTS.md equals the selected URL's response text exactly, `.replworks/` exists, and the exit code is 0.
     - The selected source is requested once, the other source is not requested, and no source representation is parsed as HTML.
-    - An invalid or missing selection produces one error line, exits 2, and creates or modifies nothing.
+    - An invalid selection prints the choices again and continues reading until a valid selection is entered.
+    - If the input ends or fails before a valid selection, one error line is printed, the exit code is 2, and nothing is created or modified.
     - Existing-item skip behavior and init write-failure behavior from T-006 and T-007 remain passing for both selections.
     - Unit tests cover selection validation, source selection, and failure handling.
