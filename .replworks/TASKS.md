@@ -112,7 +112,7 @@
     - After the command runs, no file or directory is created, modified, or deleted.
     - Unit tests for the Check Coordinator and the Rule Evaluator (documents-exist) pass.
 
-- [ ] T-012 Report an AGENTS.md that differs from the canonical text with check
+- [X] T-012 Report an AGENTS.md that differs from the canonical text with check
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-017, FR-018, FR-026); § Error Conditions (ERR-001); § Acceptance Criteria (AC-012, AC-024)
   - External boundary: yes
   - Acceptance criteria:
