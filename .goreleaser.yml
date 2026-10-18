@@ -13,7 +13,7 @@ builds:
     goarch:
       - amd64
       - arm64
-    binary: "{{ .ProjectName }}"
+    binary: repl
     ldflags:
       - -s -w
       - -X main.version={{.Version}}
@@ -51,6 +51,18 @@ homebrew_casks:
 
 checksum:
   name_template: "checksums.txt"
+
+nfpms:
+  - id: repl
+    package_name: repl
+    vendor: replworks
+    homepage: "https://github.com/replworks/repl-cli"
+    maintainer: "Samgu Lee <cable8mm@gmail.com>"
+    description: "Command-line program for REPL Works projects."
+    license: MIT
+    formats:
+      - deb
+    bindir: /usr/bin
 
 snapshot:
   version_template: "{{ .Tag }}-next"

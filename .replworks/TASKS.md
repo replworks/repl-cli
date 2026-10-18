@@ -1,6 +1,6 @@
 # TASKS.md
 
-- [ ] T-001 Project foundation
+- [X] T-001 Project foundation
   - Satisfies: PRODUCT_SPEC.md § Purpose; § User Interface (Surface: command line)
   - External boundary: no
   - Acceptance criteria:

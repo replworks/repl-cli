@@ -23,7 +23,7 @@
 - `internal/`: all non-entry-point packages.
 - `*_test.go`: next to the file under test.
 - `.golangci.yml`: repository root.
-- `.goreleaser.yaml`: repository root.
+- `.goreleaser.yml`: repository root.
 - `.github/workflows/`: GitHub Actions workflows.
 - `LICENSE`: repository root.
 
@@ -80,11 +80,11 @@
 - GoReleaser MUST build binaries for darwin, linux, and windows, each on amd64 and arm64.
 - GoReleaser MUST publish archives and a checksum file to GitHub Releases.
 - GoReleaser MUST generate `.deb` packages for linux.
-- GoReleaser MUST generate the Homebrew formula.
+- GoReleaser MUST generate the Homebrew cask.
 - Distribution channels:
   - GitHub Releases: all targets.
-  - APT repository `apt.repl.net`: linux `.deb` packages.
-  - Homebrew repository `brew.repl.net`: formula.
+  - APT repository `apt.repl.net` (GitHub Pages of `replworks/apt`): linux `.deb` packages.
+  - Homebrew tap `replworks/homebrew-tap`: cask.
 - Installation MUST NOT require source compilation.
 - `LICENSE` MUST contain the MIT license.
 
