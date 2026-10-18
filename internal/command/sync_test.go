@@ -27,6 +27,44 @@ func renderSyncOutcome(t *testing.T, outcome syncproject.Outcome) (int, string) 
 	return renderSync(cmd, outcome), buffer.String()
 }
 
+func TestRenderSyncColorsDifferenceLinesForTerminalOutput(t *testing.T) {
+	var buffer bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&buffer)
+
+	code := renderSyncOutput(cmd, syncproject.Outcome{
+		Difference: []diff.Entry{
+			{Kind: diff.Removed, Line: "old"},
+			{Kind: diff.Added, Line: "new"},
+		},
+	}, true)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	want := "\x1b[31m- old\x1b[0m\n\x1b[32m+ new\x1b[0m\n"
+	if buffer.String() != want {
+		t.Fatalf("output = %q, want %q", buffer.String(), want)
+	}
+}
+
+func TestRenderSyncLeavesDifferenceLinesPlainForNonTerminalOutput(t *testing.T) {
+	var buffer bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&buffer)
+
+	renderSyncOutput(cmd, syncproject.Outcome{
+		Difference: []diff.Entry{
+			{Kind: diff.Removed, Line: "old"},
+			{Kind: diff.Added, Line: "new"},
+		},
+	}, false)
+
+	if got, want := buffer.String(), "- old\n+ new\n"; got != want {
+		t.Fatalf("output = %q, want %q", got, want)
+	}
+}
+
 func TestSyncUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("# stale\n"), 0o644); err != nil {

@@ -69,6 +69,7 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
   - For init and sync, prompt for and validate the selected published AGENTS.md document.
   - Produce assistance output (usage help and similar) itself, without a coordinator.
   - Render each Outcome into output lines.
+  - Apply presentation colors to sync difference lines only when the output writer is a terminal.
   - Map each Outcome to an exit status.
 - Inputs: command-line arguments and, for init, the user's document selection.
 - Outputs: output lines, exit status, one Request to one Coordinator.
@@ -378,6 +379,7 @@ Request → Sync Coordinator
 - status: complete count, total count, and first incomplete task ID or a no-incomplete-task indication.
 - check: violation lines first (Rule Evaluator order), then execution error lines (gathering order). A violation line contains rule identifier, file path, message. An error line contains the subject and message.
 - sync: an up-to-date indication, or the difference lines followed by any error line.
+- sync difference lines: removed lines are red and added lines are green for terminal output; non-terminal output is plain.
 - All paths printed are relative to the Project Directory.
 
 ## 8. Architectural Rules

@@ -237,6 +237,15 @@
     - Existing sync comparison, difference, replacement, and local-read failure behavior remains passing for both selections.
     - Unit tests cover selection validation, source selection, and failure handling.
 
+- [X] T-023 Color sync differences in terminal output
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / sync (FR-035); § Acceptance Criteria (AC-038); ARCHITECTURE.md § Components (C1)
+  - External boundary: no
+  - Acceptance criteria:
+    - Removed sync difference lines are red and added sync difference lines are green when output is a terminal.
+    - Sync output contains no ANSI color sequences when output is a buffer, pipe, or regular file.
+    - Existing sync output content, exit codes, replacement behavior, and selection behavior remain passing.
+    - Unit tests cover terminal and non-terminal output.
+
 - [X] T-021 Select the AGENTS.md document during init
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-001 through FR-007); § Error Conditions (ERR-006); § Acceptance Criteria (AC-001, AC-002, AC-003, AC-022, AC-033, AC-034, AC-035); ARCHITECTURE.md § Components (C1, C2, C7)
   - External boundary: yes

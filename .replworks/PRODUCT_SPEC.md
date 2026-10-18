@@ -155,6 +155,7 @@
 - FR-029: repl sync MUST print an indication that AGENTS.md is up to date when its content is identical to the selected document.
 - FR-030: repl sync MUST print the line-by-line difference between the local AGENTS.md and the selected document when the contents differ.
 - FR-031: repl sync MUST replace the content of AGENTS.md with the selected document's content when the contents differ.
+- FR-035: repl sync MUST render removed difference lines in red and added difference lines in green when its output is a terminal, and MUST render plain difference lines otherwise.
 
 ### all commands
 
@@ -252,3 +253,4 @@
 - AC-035: Given an empty directory and an init input that ends before a valid selection, when repl init runs, then no file is created or modified, an error line is printed, and the exit code is 2. (ERR-006, EL-001)
 - AC-036: Given an AGENTS.md and an invalid sync selection followed by a valid selection, when repl sync runs, then repl sync presents the choices again and completes using the selected document. (FR-027, EL-005)
 - AC-037: Given an AGENTS.md and a sync input that ends before a valid selection, when repl sync runs, then AGENTS.md is unmodified, an error line is printed, and the exit code is 2. (ERR-007, EL-005)
+- AC-038: Given an AGENTS.md that differs from the selected document, when repl sync writes to a terminal, then removed difference lines contain the red terminal color sequence and added difference lines contain the green terminal color sequence. When output is not a terminal, the difference contains no color sequences. (FR-035, EL-005)

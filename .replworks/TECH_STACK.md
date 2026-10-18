@@ -38,6 +38,7 @@
 - MUST NOT silently recover from failures.
 - MUST NOT use panic for control flow.
 - Command output MUST be written through `cmd.OutOrStdout()` and `cmd.ErrOrStderr()`.
+- Terminal color output MUST use ANSI escape sequences from the Go standard library only, and MUST be disabled for non-terminal writers.
 - log/slog MUST be used for structured diagnostics.
 - MUST NOT log secrets, tokens, or credentials.
 - Cobra default `help` command, `--help` flag, and `completion` command MUST NOT be disabled.
