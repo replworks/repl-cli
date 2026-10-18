@@ -92,7 +92,7 @@
     - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: given an unobtainable canonical text, AGENTS.md is unmodified, one error line is printed, and the exit code is 2. Given a simulated replacement failure, the difference is still output, one error line is printed, and the exit code is 2.
     - Unit tests for the Difference Calculator pass.
 
-- [ ] T-010 Report an execution error from sync when AGENTS.md cannot be read
+- [X] T-010 Report an execution error from sync when AGENTS.md cannot be read
   - Satisfies: PRODUCT_SPEC.md § Error Conditions (ERR-004); § Acceptance Criteria (AC-028); § User Interface / Commands (EL-005: exit 2 on execution error)
   - External boundary: no
   - Acceptance criteria:

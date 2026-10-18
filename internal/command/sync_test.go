@@ -221,6 +221,61 @@ func TestSyncOutputsTheSameDifferenceAcrossRuns(t *testing.T) {
 	}
 }
 
+func TestSyncFailsWithoutAGENTSMD(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	client, transport := servePage(t, string(recordedPage(t)))
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runCommand(t, client, "sync")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if lines := errorLines(t, stdout); len(lines) != 1 {
+		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+	if got := transport.requested(); len(got) != 0 {
+		t.Fatalf("requests = %q, want no request", got)
+	}
+}
+
+func TestSyncFailsWhenAGENTSCannotBeRead(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "AGENTS.md"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, transport := servePage(t, string(recordedPage(t)))
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runCommand(t, client, "sync")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if lines := errorLines(t, stdout); len(lines) != 1 {
+		t.Fatalf("stdout has %d lines (%q), want 1", len(lines), stdout)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+	if got := transport.requested(); len(got) != 0 {
+		t.Fatalf("requests = %q, want no request", got)
+	}
+}
+
 func TestSyncReportsAReplacementFailureWithTheDifference(t *testing.T) {
 	dir := t.TempDir()
 	agents := filepath.Join(dir, "AGENTS.md")
