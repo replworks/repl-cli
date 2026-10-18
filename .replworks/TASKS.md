@@ -80,7 +80,7 @@
     - Failure behavior from ARCHITECTURE.md § Failure Boundaries (canonical text cannot be obtained or extracted) passes: given an unobtainable canonical text, AGENTS.md is unmodified, one error line is printed, and the exit code is 2.
     - Unit tests for the Sync Coordinator comparison pass.
 
-- [ ] T-009 Show the difference and replace AGENTS.md with sync
+- [X] T-009 Show the difference and replace AGENTS.md with sync
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / sync (FR-029, FR-030, FR-031); § User Interface / Commands (EL-005); § Acceptance Criteria (AC-021)
   - External boundary: yes
   - Acceptance criteria:

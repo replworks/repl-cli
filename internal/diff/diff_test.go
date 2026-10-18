@@ -98,6 +98,28 @@ func TestCompareIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestCompareLineEndingDifference(t *testing.T) {
+	got := Compare("a\r\nb\r\n", "a\nb\n")
+	want := []Entry{
+		{Kind: Removed, Line: "a\r", Position: 1},
+		{Kind: Removed, Line: "b\r", Position: 2},
+		{Kind: Added, Line: "a", Position: 1},
+		{Kind: Added, Line: "b", Position: 2},
+	}
+
+	assertEntries(t, got, want)
+}
+
+func TestCompareTrailingWhitespaceDifference(t *testing.T) {
+	got := Compare("a \n", "a\n")
+	want := []Entry{
+		{Kind: Removed, Line: "a ", Position: 1},
+		{Kind: Added, Line: "a", Position: 1},
+	}
+
+	assertEntries(t, got, want)
+}
+
 func TestCalculatorMatchesCompare(t *testing.T) {
 	local := "a\nb\n"
 	canonical := "a\nc\n"
