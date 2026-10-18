@@ -101,7 +101,7 @@
     - Given an AGENTS.md whose read fails (simulated read failure), no file is modified, one error line is printed, and the exit code is 2.
     - Unit tests for the Sync Coordinator local-check handling pass.
 
-- [ ] T-011 Report missing authoritative documents with check
+- [X] T-011 Report missing authoritative documents with check
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-013, FR-018, FR-025); § User Interface / Commands (EL-003); § Acceptance Criteria (AC-007, AC-014)
   - External boundary: no
   - Acceptance criteria:
