@@ -149,7 +149,7 @@
     - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: when the base ledger cannot be obtained (invalid repository or base branch), this rule is not evaluated.
     - Unit tests for the Rule Evaluator (task-ids-unchanged) pass.
 
-- [ ] T-015 Report multiple newly complete tasks with check
+- [X] T-015 Report multiple newly complete tasks with check
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-015, FR-022, FR-023); § User Interface / Commands (EL-003); § Acceptance Criteria (AC-009, AC-017)
   - External boundary: yes
   - Acceptance criteria:

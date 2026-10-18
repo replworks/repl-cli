@@ -643,3 +643,121 @@ func writeTasks(t *testing.T, dir, content string) {
 		t.Fatalf("setup: %v", err)
 	}
 }
+
+func TestCheckReportsMoreThanOneNewlyCompleteTask(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [ ] T-001 first\n- [ ] T-002 second\n")
+	initRepository(t, dir)
+	writeTasks(t, dir, "- [x] T-001 first\n- [x] T-002 second\n")
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{"single-task-completion .replworks/TASKS.md: 2 tasks are newly complete"}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}
+
+func TestCheckDoesNotReportOneNewlyCompleteTask(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [ ] T-001 first\n- [ ] T-002 second\n")
+	initRepository(t, dir)
+	writeTasks(t, dir, "- [x] T-001 first\n- [ ] T-002 second\n")
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+}
+
+func TestCheckCountsEveryCompleteTaskWithoutTasksOnTheBase(t *testing.T) {
+	tests := []struct {
+		name    string
+		tasks   string
+		wantOne bool
+	}{
+		{name: "two complete", tasks: "- [x] T-001 first\n- [x] T-002 second\n", wantOne: true},
+		{name: "one complete", tasks: "- [x] T-001 first\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeDocuments(t, dir, recordedText(t))
+			initRepository(t, dir)
+			writeTasks(t, dir, tt.tasks)
+			t.Chdir(dir)
+
+			client, _ := servePage(t, string(recordedPage(t)))
+			before := directoryState(t, dir)
+
+			code, stdout, stderr := runCommand(t, client, "check")
+
+			want := 0
+			if tt.wantOne {
+				want = 1
+			}
+			if code != want {
+				t.Fatalf("exit code = %d, want %d (stdout = %q)", code, want, stdout)
+			}
+			if lines := errorLines(t, stdout); (len(lines) == 1) != tt.wantOne {
+				t.Fatalf("stdout = %q, want one violation: %v", stdout, tt.wantOne)
+			}
+			if stderr != "" {
+				t.Fatalf("stderr = %q, want empty", stderr)
+			}
+			if after := directoryState(t, dir); after != before {
+				t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+			}
+		})
+	}
+}
+
+func TestCheckCountsDuplicateTaskIDsAsSeparateEntries(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [ ] T-001 first\n")
+	initRepository(t, dir)
+	writeTasks(t, dir, "- [x] T-001 first\n- [x] T-001 first again\n")
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	want := []string{"single-task-completion .replworks/TASKS.md: 2 tasks are newly complete"}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+}

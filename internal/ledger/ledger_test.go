@@ -145,3 +145,26 @@ func TestNewHandlesCRLF(t *testing.T) {
 		t.Fatalf("FirstIncompleteID = %q, want %q", led.FirstIncompleteID, "T-002")
 	}
 }
+
+func TestNewKeepsEveryEntryInOrder(t *testing.T) {
+	text := "" +
+		"- [X] T-002 second\n" +
+		"- [ ] T-001 first\n" +
+		"- [x] T-002 second again\n"
+
+	led := New(text)
+
+	want := []Entry{
+		{ID: "T-002", Complete: true},
+		{ID: "T-001", Complete: false},
+		{ID: "T-002", Complete: true},
+	}
+	if len(led.Entries) != len(want) {
+		t.Fatalf("Entries = %v, want %v", led.Entries, want)
+	}
+	for i, entry := range want {
+		if led.Entries[i] != entry {
+			t.Fatalf("Entries = %v, want %v", led.Entries, want)
+		}
+	}
+}
