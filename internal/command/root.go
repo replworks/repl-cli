@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -17,21 +18,29 @@ type App struct {
 }
 
 func (a App) Execute(args []string) int {
-	root := a.newRootCommand()
+	r := &runner{app: a}
+	root := r.newRootCommand()
 	root.SetArgs(args)
+
 	if err := root.Execute(); err != nil {
 		_, _ = fmt.Fprintln(a.Stderr, errorLine(err))
 		return 2
 	}
-	return 0
+
+	return r.status
 }
 
-func (a App) newRootCommand() *cobra.Command {
+type runner struct {
+	app    App
+	status int
+}
+
+func (r *runner) newRootCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "repl",
 		Short:         "Command-line program for REPL Works projects",
 		Long:          "repl operates on a REPL Works project directory: it installs the canonical AGENTS.md, reports task progress, verifies project rules, and updates AGENTS.md.",
-		Version:       a.versionString(),
+		Version:       r.app.versionString(),
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Args:          cobra.ArbitraryArgs,
@@ -42,9 +51,20 @@ func (a App) newRootCommand() *cobra.Command {
 			return cmd.Help()
 		},
 	}
-	root.SetOut(a.Stdout)
-	root.SetErr(a.Stderr)
+	root.SetOut(r.app.Stdout)
+	root.SetErr(r.app.Stderr)
+	root.AddCommand(r.newStatusCommand())
+
 	return root
+}
+
+func (r *runner) projectDir() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("determining the project directory: %w", err)
+	}
+
+	return dir, nil
 }
 
 func (a App) versionString() string {

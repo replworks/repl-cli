@@ -18,7 +18,7 @@
     - In both cases no network request is sent (ARCHITECTURE.md § Failure Boundaries: unknown command or option).
     - Unit tests for the Command Interface pass.
 
-- [ ] T-003 Report task progress with status
+- [X] T-003 Report task progress with status
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / status (FR-008, FR-009, FR-010, FR-011, FR-012); § User Interface / Commands (EL-002); § Acceptance Criteria (AC-004, AC-005, AC-006)
   - External boundary: no
   - Acceptance criteria:
