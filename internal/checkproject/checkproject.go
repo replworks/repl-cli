@@ -6,22 +6,30 @@ import (
 
 	"github.com/replworks/repl-cli/internal/fact"
 	"github.com/replworks/repl-cli/internal/ledger"
+	"github.com/replworks/repl-cli/internal/mark"
 	"github.com/replworks/repl-cli/internal/rule"
 )
 
 const (
-	agentsPath = "AGENTS.md"
-	tasksPath  = ".replworks/TASKS.md"
+	agentsPath    = "AGENTS.md"
+	tasksPath     = ".replworks/TASKS.md"
+	productSpec   = ".replworks/PRODUCT_SPEC.md"
+	techStackPath = ".replworks/TECH_STACK.md"
+	architecture  = ".replworks/ARCHITECTURE.md"
 )
 
 // documents are the authoritative documents, in the order they are read.
 var documents = []string{
 	agentsPath,
-	".replworks/PRODUCT_SPEC.md",
-	".replworks/TECH_STACK.md",
-	".replworks/ARCHITECTURE.md",
+	productSpec,
+	techStackPath,
+	architecture,
 	tasksPath,
 }
+
+// markDocuments are the documents that may carry UNVERIFIED marks, in the
+// order the Rule Evaluator reports them.
+var markDocuments = []string{productSpec, techStackPath, architecture}
 
 // Workspace is the project directory with the Read capability.
 type Workspace interface {
@@ -57,7 +65,7 @@ type Coordinator struct {
 // working tree.
 func (c Coordinator) Run(branch string) Outcome {
 	gathered := make([]rule.Document, 0, len(documents))
-	var agents, tasks fact.Fact[string]
+	texts := make(map[string]fact.Fact[string], len(documents))
 	var errors []error
 
 	for _, path := range documents {
@@ -65,13 +73,13 @@ func (c Coordinator) Run(branch string) Outcome {
 		if text.IsFailed() {
 			errors = append(errors, text.Reason())
 		}
-		switch path {
-		case agentsPath:
-			agents = text
-		case tasksPath:
-			tasks = text
-		}
+		texts[path] = text
 		gathered = append(gathered, rule.Document{Path: path, Text: text})
+	}
+
+	markLists := make([]rule.MarkList, 0, len(markDocuments))
+	for _, path := range markDocuments {
+		markLists = append(markLists, rule.MarkList{Path: path, Marks: marksFact(path, texts[path])})
 	}
 
 	canonical := c.Source.Canonical()
@@ -87,10 +95,11 @@ func (c Coordinator) Run(branch string) Outcome {
 	return Outcome{
 		Violations: c.Evaluator.Evaluate(rule.Facts{
 			Documents:     gathered,
-			Agents:        agents,
+			Agents:        texts[agentsPath],
 			Canonical:     canonical,
-			WorkingLedger: ledgerFact(tasks),
+			WorkingLedger: ledgerFact(texts[tasksPath]),
 			BaseLedger:    ledgerFact(base),
+			MarkLists:     markLists,
 		}),
 		Errors: errors,
 	}
@@ -104,6 +113,17 @@ func ledgerFact(text fact.Fact[string]) fact.Fact[ledger.Ledger] {
 		return fact.Failed[ledger.Ledger](text.Reason())
 	default:
 		return fact.Absent[ledger.Ledger]()
+	}
+}
+
+func marksFact(path string, text fact.Fact[string]) fact.Fact[[]mark.Mark] {
+	switch {
+	case text.IsPresent():
+		return fact.Present(mark.Scanner{}.Scan(path, text.Value()))
+	case text.IsFailed():
+		return fact.Failed[[]mark.Mark](text.Reason())
+	default:
+		return fact.Absent[[]mark.Mark]()
 	}
 }
 

@@ -163,7 +163,7 @@
     - Failure behavior from ARCHITECTURE.md § Failure Boundaries passes: when the base ledger cannot be obtained, this rule is not evaluated.
     - Unit tests for the Rule Evaluator (newly complete derivation, single-task-completion) pass.
 
-- [ ] T-016 Report UNVERIFIED marks with check
+- [X] T-016 Report UNVERIFIED marks with check
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / check (FR-016, FR-023); § User Interface / Commands (EL-003); § Acceptance Criteria (AC-010, AC-011, AC-018)
   - External boundary: yes
   - Acceptance criteria:

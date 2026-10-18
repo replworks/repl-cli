@@ -7,6 +7,7 @@ import (
 
 	"github.com/replworks/repl-cli/internal/fact"
 	"github.com/replworks/repl-cli/internal/ledger"
+	"github.com/replworks/repl-cli/internal/mark"
 )
 
 func TestEvaluateReportsEveryAbsentDocumentInOrder(t *testing.T) {
@@ -206,6 +207,9 @@ func TestEvaluateReportsRulesInTheFixedOrder(t *testing.T) {
 		Canonical:     fact.Present("# AGENTS.md\n"),
 		WorkingLedger: fact.Present(ledger.New("- [x] T-002 second\n- [x] T-003 third\n")),
 		BaseLedger:    fact.Present(ledger.New("- [ ] T-001 first\n")),
+		MarkLists: []MarkList{
+			{Path: ".replworks/ARCHITECTURE.md", Marks: fact.Present([]mark.Mark{{Path: ".replworks/ARCHITECTURE.md", Line: 7}})},
+		},
 	}
 
 	got := Evaluator{}.Evaluate(facts)
@@ -214,6 +218,7 @@ func TestEvaluateReportsRulesInTheFixedOrder(t *testing.T) {
 		{Rule: RuleDocumentsExist, Path: ".replworks/PRODUCT_SPEC.md", Message: "document does not exist"},
 		{Rule: RuleTaskIDsUnchanged, Path: ".replworks/TASKS.md", Message: "missing task ID T-001"},
 		{Rule: RuleSingleTaskCompletion, Path: ".replworks/TASKS.md", Message: "2 tasks are newly complete"},
+		{Rule: RuleNoUnverified, Path: ".replworks/ARCHITECTURE.md", Message: "UNVERIFIED mark on line 7"},
 		{Rule: RuleAgentsCanonical, Path: "AGENTS.md", Message: "AGENTS.md differs from the canonical AGENTS.md"},
 	}
 
@@ -342,6 +347,140 @@ func TestEvaluateDoesNotReportNewlyCompleteForOtherLedgerStates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := Evaluator{}.Evaluate(Facts{WorkingLedger: tt.working, BaseLedger: tt.base})
+
+			if len(got) != 0 {
+				t.Fatalf("violations = %v, want none", got)
+			}
+		})
+	}
+}
+
+func TestEvaluateReportsNoUnverifiedMarks(t *testing.T) {
+	architecture := ".replworks/ARCHITECTURE.md"
+	facts := Facts{
+		WorkingLedger: fact.Present(ledger.New("- [x] T-001 first\n")),
+		BaseLedger:    fact.Present(ledger.New("- [ ] T-001 first\n")),
+		MarkLists: []MarkList{
+			{Path: ".replworks/PRODUCT_SPEC.md", Marks: fact.Present([]mark.Mark{})},
+			{Path: architecture, Marks: fact.Present([]mark.Mark{{Path: architecture, Line: 12}})},
+		},
+	}
+
+	got := Evaluator{}.Evaluate(facts)
+
+	want := []Violation{
+		{Rule: RuleNoUnverified, Path: architecture, Message: "UNVERIFIED mark on line 12"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("violations = %v, want %v", got, want)
+	}
+}
+
+func TestEvaluateReportsOneViolationPerMark(t *testing.T) {
+	productSpec := ".replworks/PRODUCT_SPEC.md"
+	techStack := ".replworks/TECH_STACK.md"
+	facts := Facts{
+		WorkingLedger: fact.Present(ledger.New("- [x] T-001 first\n")),
+		BaseLedger:    fact.Present(ledger.New("- [ ] T-001 first\n")),
+		MarkLists: []MarkList{
+			{Path: productSpec, Marks: fact.Present([]mark.Mark{
+				{Path: productSpec, Line: 3},
+				{Path: productSpec, Line: 3},
+				{Path: productSpec, Line: 27},
+			})},
+			{Path: techStack, Marks: fact.Present([]mark.Mark{{Path: techStack, Line: 5}})},
+		},
+	}
+
+	got := Evaluator{}.Evaluate(facts)
+
+	want := []Violation{
+		{Rule: RuleNoUnverified, Path: productSpec, Message: "UNVERIFIED mark on line 3"},
+		{Rule: RuleNoUnverified, Path: productSpec, Message: "UNVERIFIED mark on line 3"},
+		{Rule: RuleNoUnverified, Path: productSpec, Message: "UNVERIFIED mark on line 27"},
+		{Rule: RuleNoUnverified, Path: techStack, Message: "UNVERIFIED mark on line 5"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("violations = %v, want %v", got, want)
+	}
+}
+
+func TestEvaluateDoesNotReportNoUnverifiedForOtherStates(t *testing.T) {
+	architecture := ".replworks/ARCHITECTURE.md"
+	marks := func() fact.Fact[[]mark.Mark] {
+		return fact.Present([]mark.Mark{{Path: architecture, Line: 1}})
+	}
+
+	tests := []struct {
+		name       string
+		facts      Facts
+		noReported bool
+	}{
+		{
+			name: "no newly complete task",
+			facts: Facts{
+				WorkingLedger: fact.Present(ledger.New("- [x] T-001 first\n")),
+				BaseLedger:    fact.Present(ledger.New("- [x] T-001 first\n")),
+				MarkLists:     []MarkList{{Path: architecture, Marks: marks()}},
+			},
+		},
+		{
+			name: "failed working ledger",
+			facts: Facts{
+				WorkingLedger: fact.Failed[ledger.Ledger](errors.New("permission denied")),
+				BaseLedger:    fact.Present(ledger.New("")),
+				MarkLists:     []MarkList{{Path: architecture, Marks: marks()}},
+			},
+		},
+		{
+			name: "failed base ledger",
+			facts: Facts{
+				WorkingLedger: fact.Present(ledger.New("- [x] T-001 first\n")),
+				BaseLedger:    fact.Failed[ledger.Ledger](errors.New("unreachable")),
+				MarkLists:     []MarkList{{Path: architecture, Marks: marks()}},
+			},
+		},
+		{
+			name: "absent working ledger",
+			facts: Facts{
+				WorkingLedger: fact.Absent[ledger.Ledger](),
+				BaseLedger:    fact.Present(ledger.New("")),
+				MarkLists:     []MarkList{{Path: architecture, Marks: marks()}},
+			},
+		},
+		{
+			name: "failed mark list",
+			facts: Facts{
+				WorkingLedger: fact.Present(ledger.New("- [x] T-001 first\n")),
+				BaseLedger:    fact.Present(ledger.New("")),
+				MarkLists: []MarkList{
+					{Path: architecture, Marks: fact.Failed[[]mark.Mark](errors.New("permission denied"))},
+				},
+			},
+		},
+		{
+			name: "no mark list",
+			facts: Facts{
+				WorkingLedger: fact.Present(ledger.New("- [x] T-001 first\n")),
+				BaseLedger:    fact.Present(ledger.New("")),
+			},
+		},
+		{
+			name: "absent mark lists",
+			facts: Facts{
+				WorkingLedger: fact.Present(ledger.New("- [x] T-001 first\n")),
+				BaseLedger:    fact.Present(ledger.New("")),
+				MarkLists: []MarkList{
+					{Path: architecture, Marks: fact.Absent[[]mark.Mark]()},
+					{Path: ".replworks/TECH_STACK.md", Marks: fact.Present([]mark.Mark{})},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Evaluator{}.Evaluate(tt.facts)
 
 			if len(got) != 0 {
 				t.Fatalf("violations = %v, want none", got)

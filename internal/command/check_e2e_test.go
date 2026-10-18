@@ -465,3 +465,59 @@ func TestCheckAgainstTheLiveRepositoryReportsOneNewlyCompleteTask(t *testing.T) 
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
 }
+
+func TestCheckAgainstTheLiveRepositoryReportsAnUnverifiedMark(t *testing.T) {
+	want := liveCanonical(t)
+
+	dir := t.TempDir()
+	writeDocuments(t, dir, want)
+	writeTasks(t, dir, "- [ ] T-001 first\n")
+	initRepository(t, dir)
+	writeTasks(t, dir, "- [x] T-001 first\n")
+	writeDocument(t, dir, filepath.Join(".replworks", "ARCHITECTURE.md"),
+		"# ARCHITECTURE.md\n\n## 7. Data Flow [UNVERIFIED]\n")
+	t.Chdir(dir)
+
+	client, _ := liveRecordingClient()
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	lines := errorLines(t, stdout)
+	wantLines := []string{"no-unverified .replworks/ARCHITECTURE.md: UNVERIFIED mark on line 3"}
+	if !reflect.DeepEqual(lines, wantLines) {
+		t.Fatalf("stdout = %q, want %q", stdout, wantLines)
+	}
+}
+
+func TestCheckAgainstTheLiveRepositoryReportsNoUnverifiedMarkWithoutANewlyCompleteTask(t *testing.T) {
+	want := liveCanonical(t)
+
+	dir := t.TempDir()
+	writeDocuments(t, dir, want)
+	writeTasks(t, dir, "- [x] T-001 first\n")
+	initRepository(t, dir)
+	writeDocument(t, dir, filepath.Join(".replworks", "ARCHITECTURE.md"),
+		"# ARCHITECTURE.md\n\n## 7. Data Flow [UNVERIFIED]\n")
+	t.Chdir(dir)
+
+	client, _ := liveRecordingClient()
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want no line", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+}

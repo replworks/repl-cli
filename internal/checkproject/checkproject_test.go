@@ -397,3 +397,138 @@ func TestRunDoesNotReportNewlyCompleteTaskWhenTheBaseBranchFails(t *testing.T) {
 		t.Fatalf("errors = %v, want the base branch failure", outcome.Errors)
 	}
 }
+
+func TestRunReportsNoUnverifiedMarks(t *testing.T) {
+	texts := presentDocuments("# AGENTS.md\n", "- [x] T-001 first\n")
+	texts[productSpec] = fact.Present("# PRODUCT_SPEC.md\n\n## 1. Purpose [UNVERIFIED]\n")
+	coord, _ := coordinator(texts)
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [ ] T-001 first\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	want := []rule.Violation{
+		{Rule: rule.RuleNoUnverified, Path: productSpec, Message: "UNVERIFIED mark on line 3"},
+	}
+	if !reflect.DeepEqual(outcome.Violations, want) {
+		t.Fatalf("violations = %v, want %v", outcome.Violations, want)
+	}
+	if len(outcome.Errors) != 0 {
+		t.Fatalf("errors = %v, want none", outcome.Errors)
+	}
+}
+
+func TestRunReportsMarksInDocumentOrder(t *testing.T) {
+	texts := presentDocuments("# AGENTS.md\n", "- [x] T-001 first\n")
+	texts[techStackPath] = fact.Present("## 6. CI [UNVERIFIED]\n")
+	texts[architecture] = fact.Present("# ARCHITECTURE.md\n## 1. Purpose [UNVERIFIED]\n")
+	coord, _ := coordinator(texts)
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [ ] T-001 first\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	want := []rule.Violation{
+		{Rule: rule.RuleNoUnverified, Path: techStackPath, Message: "UNVERIFIED mark on line 1"},
+		{Rule: rule.RuleNoUnverified, Path: architecture, Message: "UNVERIFIED mark on line 2"},
+	}
+	if !reflect.DeepEqual(outcome.Violations, want) {
+		t.Fatalf("violations = %v, want %v", outcome.Violations, want)
+	}
+}
+
+func TestRunDoesNotReportMarksFromAnAbsentDocument(t *testing.T) {
+	texts := presentDocuments("# AGENTS.md\n", "- [x] T-001 first\n")
+	texts[productSpec] = fact.Absent[string]()
+	texts[architecture] = fact.Present("## 1. Purpose [UNVERIFIED]\n")
+	coord, _ := coordinator(texts)
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [ ] T-001 first\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	want := []rule.Violation{
+		{Rule: rule.RuleDocumentsExist, Path: productSpec, Message: "document does not exist"},
+		{Rule: rule.RuleNoUnverified, Path: architecture, Message: "UNVERIFIED mark on line 1"},
+	}
+	if !reflect.DeepEqual(outcome.Violations, want) {
+		t.Fatalf("violations = %v, want %v", outcome.Violations, want)
+	}
+}
+
+func TestRunDoesNotReportMarksWhenADocumentReadFails(t *testing.T) {
+	readFailure := errors.New("permission denied")
+	texts := presentDocuments("# AGENTS.md\n", "- [x] T-001 first\n")
+	texts[techStackPath] = fact.Failed[string](readFailure)
+	texts[architecture] = fact.Present("## 1. Purpose [UNVERIFIED]\n")
+	coord, _ := coordinator(texts)
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [ ] T-001 first\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	if len(outcome.Violations) != 0 {
+		t.Fatalf("violations = %v, want none", outcome.Violations)
+	}
+	if len(outcome.Errors) != 1 || !errors.Is(outcome.Errors[0], readFailure) {
+		t.Fatalf("errors = %v, want the read failure", outcome.Errors)
+	}
+}
+
+func TestRunDoesNotReportMarksWithoutATaskLedger(t *testing.T) {
+	texts := presentDocuments("# AGENTS.md\n", "")
+	texts[tasksPath] = fact.Absent[string]()
+	texts[architecture] = fact.Present("## 1. Purpose [UNVERIFIED]\n")
+	coord, _ := coordinator(texts)
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [ ] T-001 first\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	want := []rule.Violation{
+		{Rule: rule.RuleDocumentsExist, Path: tasksPath, Message: "document does not exist"},
+	}
+	if !reflect.DeepEqual(outcome.Violations, want) {
+		t.Fatalf("violations = %v, want %v", outcome.Violations, want)
+	}
+}
+
+func TestRunDoesNotReportMarksWithoutANewlyCompleteTask(t *testing.T) {
+	texts := presentDocuments("# AGENTS.md\n", "- [x] T-001 first\n")
+	texts[architecture] = fact.Present("## 1. Purpose [UNVERIFIED]\n")
+	coord, _ := coordinator(texts)
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [x] T-001 first\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	if len(outcome.Violations) != 0 {
+		t.Fatalf("violations = %v, want none", outcome.Violations)
+	}
+}
+
+func TestRunDoesNotReportMarksInAgentsOrTasks(t *testing.T) {
+	agents := "# AGENTS.md\n\n## Notes [UNVERIFIED]\n"
+	tasks := "- [x] T-001 first\n\n## Notes [UNVERIFIED]\n"
+	texts := presentDocuments(agents, tasks)
+	coord, _ := coordinator(texts)
+	coord.Source = &fakeSource{canonical: fact.Present(agents)}
+	coord.Bases = &fakeBaseReader{texts: map[string]fact.Fact[string]{
+		baseBranch: fact.Present("- [ ] T-001 first\n"),
+	}}
+
+	outcome := coord.Run(baseBranch)
+
+	if len(outcome.Violations) != 0 {
+		t.Fatalf("violations = %v, want none", outcome.Violations)
+	}
+	if len(outcome.Errors) != 0 {
+		t.Fatalf("errors = %v, want none", outcome.Errors)
+	}
+}
