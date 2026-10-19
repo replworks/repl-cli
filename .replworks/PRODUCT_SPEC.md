@@ -78,7 +78,7 @@
 ### Commands
 
 - EL-001: repl init
-  - Purpose: create AGENTS.md and the .replworks/ directory in the project directory.
+  - Purpose: create AGENTS.md, the .replworks/ directory, and the four authoritative documents under .replworks/ in the project directory.
   - Input: an interactive selection of one of the two published AGENTS.md documents.
   - Output: one line per created item and one line per skipped item, each containing the item path.
   - Exit: 0 on completion, 2 on execution error.
@@ -118,10 +118,11 @@
 - FR-001: repl init MUST present the user with exactly these choices, in this order: `https://www.repl.net/documents/agents.md` and `https://www.repl.net/documents/agents-auto.md`, then create AGENTS.md with the content of the selected document when AGENTS.md does not exist.
 - FR-002: repl init MUST create the .replworks/ directory in the project directory when it does not exist.
 - FR-003: repl init MUST NOT modify an existing file.
-- FR-004: repl init MUST NOT create any file or directory other than AGENTS.md and .replworks/.
+- FR-004: repl init MUST NOT create any file or directory other than AGENTS.md, .replworks/, and the four documents defined in FR-036.
 - FR-005: repl init MUST print the path of each item it created.
 - FR-006: repl init MUST print the path of each item it skipped because the item already exists.
 - FR-007: repl init MUST exit with code 0 when it completes, including when it skipped items.
+- FR-036: repl init MUST create .replworks/PRODUCT_SPEC.md, .replworks/TECH_STACK.md, .replworks/ARCHITECTURE.md, and .replworks/TASKS.md as empty files when they do not exist.
 
 ### status
 
@@ -218,7 +219,7 @@
 
 - AC-001: Given an empty directory and a valid selection of `https://www.repl.net/documents/agents.md`, when repl init runs, then AGENTS.md exists with that document's exact content, the .replworks/ directory exists, and the exit code is 0. (FR-001, FR-002, FR-005, FR-007, EL-001)
 - AC-002: Given a directory with an existing AGENTS.md, when repl init runs, then the content of AGENTS.md is unchanged, the output contains the AGENTS.md path as skipped, and the exit code is 0. (FR-003, FR-006, FR-007, EL-001)
-- AC-003: Given an empty directory, when repl init runs, then no file or directory other than AGENTS.md and .replworks/ exists. (FR-004, EL-001)
+- AC-003: Given an empty directory, when repl init runs, then no file or directory other than AGENTS.md, .replworks/, and the four documents defined in FR-036 exists. (FR-004, EL-001)
 - AC-004: Given a TASKS.md with 5 tasks of which 2 are complete, when repl status runs, then the output contains 2, 5, and the task ID of the first incomplete task, and the exit code is 0. (FR-008, FR-009, FR-010, EL-002)
 - AC-005: Given a TASKS.md in which every task is complete, when repl status runs, then the output contains an indication that no incomplete task exists. (FR-011, EL-002)
 - AC-006: Given a project directory, when repl status runs, then no file is modified. (FR-012, EL-002)
@@ -254,3 +255,5 @@
 - AC-036: Given an AGENTS.md and an invalid sync selection followed by a valid selection, when repl sync runs, then repl sync presents the choices again and completes using the selected document. (FR-027, EL-005)
 - AC-037: Given an AGENTS.md and a sync input that ends before a valid selection, when repl sync runs, then AGENTS.md is unmodified, an error line is printed, and the exit code is 2. (ERR-007, EL-005)
 - AC-038: Given an AGENTS.md that differs from the selected document, when repl sync writes to a terminal, then removed difference lines contain the red terminal color sequence and added difference lines contain the green terminal color sequence. When output is not a terminal, the difference contains no color sequences. (FR-035, EL-005)
+- AC-039: Given an empty directory and a valid selection, when repl init runs, then .replworks/PRODUCT_SPEC.md, .replworks/TECH_STACK.md, .replworks/ARCHITECTURE.md, and .replworks/TASKS.md exist with zero bytes, and each is reported as created. (FR-005, FR-036, EL-001)
+- AC-040: Given a .replworks/ directory that contains some but not all of the four documents, when repl init runs, then each missing document is created empty, each existing document is unchanged and reported as skipped, and the exit code is 0. (FR-003, FR-006, FR-036, EL-001)

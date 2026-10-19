@@ -82,7 +82,7 @@ func newSource() *fakeSource {
 	return &fakeSource{canonical: fact.Present(canonicalText)}
 }
 
-func TestRunCreatesBothEntries(t *testing.T) {
+func TestRunCreatesEveryEntry(t *testing.T) {
 	source := newSource()
 	writer := newFakeWriter()
 
@@ -91,7 +91,14 @@ func TestRunCreatesBothEntries(t *testing.T) {
 	if len(outcome.Errors) > 0 {
 		t.Fatalf("errors = %v, want none", outcome.Errors)
 	}
-	want := []Item{{Path: "AGENTS.md", Created: true}, {Path: ".replworks", Created: true}}
+	want := []Item{
+		{Path: "AGENTS.md", Created: true},
+		{Path: ".replworks", Created: true},
+		{Path: ".replworks/PRODUCT_SPEC.md", Created: true},
+		{Path: ".replworks/TECH_STACK.md", Created: true},
+		{Path: ".replworks/ARCHITECTURE.md", Created: true},
+		{Path: ".replworks/TASKS.md", Created: true},
+	}
 	if len(outcome.Items) != len(want) {
 		t.Fatalf("items = %+v, want %+v", outcome.Items, want)
 	}
@@ -103,36 +110,58 @@ func TestRunCreatesBothEntries(t *testing.T) {
 	if got := writer.files["AGENTS.md"]; got != canonicalText {
 		t.Fatalf("AGENTS.md content = %q, want the canonical text", got)
 	}
+	for _, path := range []string{
+		".replworks/PRODUCT_SPEC.md",
+		".replworks/TECH_STACK.md",
+		".replworks/ARCHITECTURE.md",
+		".replworks/TASKS.md",
+	} {
+		content, ok := writer.files[path]
+		if !ok {
+			t.Fatalf("%s was not created", path)
+		}
+		if content != "" {
+			t.Fatalf("%s content = %q, want empty", path, content)
+		}
+	}
 	if !writer.dirs[".replworks"] {
 		t.Fatal(".replworks was not created")
 	}
 	if source.calls != 1 {
 		t.Fatalf("canonical source called %d times, want 1", source.calls)
 	}
-	wantTrace := "exists AGENTS.md, create-file AGENTS.md, exists .replworks, create-directory .replworks"
+	wantTrace := "exists AGENTS.md, create-file AGENTS.md, exists .replworks, create-directory .replworks, " +
+		"exists .replworks/PRODUCT_SPEC.md, create-file .replworks/PRODUCT_SPEC.md, " +
+		"exists .replworks/TECH_STACK.md, create-file .replworks/TECH_STACK.md, " +
+		"exists .replworks/ARCHITECTURE.md, create-file .replworks/ARCHITECTURE.md, " +
+		"exists .replworks/TASKS.md, create-file .replworks/TASKS.md"
 	if got := writer.trace(); got != wantTrace {
 		t.Fatalf("trace = %q, want %q", got, wantTrace)
 	}
 }
 
 func TestRunSkipsExistingEntries(t *testing.T) {
-	writer := newFakeWriter("AGENTS.md", ".replworks")
+	writer := newFakeWriter(itemPaths...)
 
 	outcome := Coordinator{Source: newSource(), Workspace: writer}.Run()
 
 	if len(outcome.Errors) > 0 {
 		t.Fatalf("errors = %v, want none", outcome.Errors)
 	}
-	want := []Item{{Path: "AGENTS.md"}, {Path: ".replworks"}}
+	if len(outcome.Items) != len(itemPaths) {
+		t.Fatalf("items = %+v, want %d skipped items", outcome.Items, len(itemPaths))
+	}
 	for i, item := range outcome.Items {
-		if item != want[i] {
-			t.Fatalf("items[%d] = %+v, want %+v", i, item, want[i])
+		want := Item{Path: itemPaths[i]}
+		if item != want {
+			t.Fatalf("items[%d] = %+v, want %+v", i, item, want)
 		}
 	}
 	if len(writer.files) > 0 || len(writer.dirs) > 0 {
 		t.Fatalf("the project directory was modified: files = %v, dirs = %v", writer.files, writer.dirs)
 	}
-	if writer.trace() != "exists AGENTS.md, exists .replworks" {
+	wantTrace := "exists " + strings.Join(itemPaths, ", exists ")
+	if writer.trace() != wantTrace {
 		t.Fatalf("trace = %q, want only presence checks", writer.trace())
 	}
 }
@@ -151,11 +180,48 @@ func TestRunCreatesTheMissingEntryOnly(t *testing.T) {
 	if !outcome.Items[1].Created {
 		t.Fatal(".replworks was not created")
 	}
-	if len(writer.files) > 0 {
+	if _, ok := writer.files["AGENTS.md"]; ok {
 		t.Fatalf("AGENTS.md was written: %v", writer.files)
 	}
 	if !writer.dirs[".replworks"] {
 		t.Fatal(".replworks was not created")
+	}
+}
+
+func TestRunCreatesOnlyTheMissingDocuments(t *testing.T) {
+	writer := newFakeWriter(
+		"AGENTS.md",
+		".replworks",
+		".replworks/PRODUCT_SPEC.md",
+		".replworks/ARCHITECTURE.md",
+		".replworks/TASKS.md",
+	)
+
+	outcome := Coordinator{Source: newSource(), Workspace: writer}.Run()
+
+	if len(outcome.Errors) > 0 {
+		t.Fatalf("errors = %v, want none", outcome.Errors)
+	}
+	if len(outcome.Items) != len(itemPaths) {
+		t.Fatalf("items = %+v, want %d items", outcome.Items, len(itemPaths))
+	}
+	for i, item := range outcome.Items {
+		want := Item{Path: itemPaths[i]}
+		if itemPaths[i] == ".replworks/TECH_STACK.md" {
+			want.Created = true
+		}
+		if item != want {
+			t.Fatalf("items[%d] = %+v, want %+v", i, item, want)
+		}
+	}
+	if got := writer.files[".replworks/TECH_STACK.md"]; got != "" {
+		t.Fatalf("TECH_STACK.md content = %q, want empty", got)
+	}
+	if len(writer.files) != 1 {
+		t.Fatalf("files = %v, want only the created document", writer.files)
+	}
+	if len(writer.dirs) > 0 {
+		t.Fatalf("dirs = %v, want none", writer.dirs)
 	}
 }
 

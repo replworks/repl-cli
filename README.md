@@ -20,7 +20,7 @@ package from the [replworks APT repository](https://apt.repl.net).
 ## Usage
 
 ```sh
-repl init      # create AGENTS.md and .replworks/
+repl init      # create AGENTS.md and the .replworks documents
 repl status    # report task progress from .replworks/TASKS.md
 repl check     # verify the project against the project rules
 repl sync      # replace AGENTS.md with the canonical AGENTS.md

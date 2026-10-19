@@ -96,7 +96,30 @@ func TestInitAgainstTheLiveSource(t *testing.T) {
 		t.Fatalf("project directory holds %d entries, want 2", len(entries))
 	}
 
-	for _, want := range []string{"created: AGENTS.md", "created: .replworks"} {
+	documents := []string{
+		".replworks/PRODUCT_SPEC.md",
+		".replworks/TECH_STACK.md",
+		".replworks/ARCHITECTURE.md",
+		".replworks/TASKS.md",
+	}
+	for _, document := range documents {
+		content, err := os.ReadFile(filepath.Join(dir, document))
+		if err != nil {
+			t.Fatalf("reading %s: %v", document, err)
+		}
+		if len(content) != 0 {
+			t.Fatalf("%s = %q, want an empty file", document, content)
+		}
+	}
+
+	for _, want := range []string{
+		"created: AGENTS.md",
+		"created: .replworks",
+		"created: .replworks/PRODUCT_SPEC.md",
+		"created: .replworks/TECH_STACK.md",
+		"created: .replworks/ARCHITECTURE.md",
+		"created: .replworks/TASKS.md",
+	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout = %q, want it to contain %q", stdout, want)
 		}
@@ -134,7 +157,14 @@ func TestInitAgainstTheLiveSourceKeepsAnExistingAgentsMD(t *testing.T) {
 		t.Fatalf("stat .replworks: %v, want an existing directory", err)
 	}
 
-	for _, want := range []string{"skipped: AGENTS.md", "created: .replworks"} {
+	for _, want := range []string{
+		"skipped: AGENTS.md",
+		"created: .replworks",
+		"created: .replworks/PRODUCT_SPEC.md",
+		"created: .replworks/TECH_STACK.md",
+		"created: .replworks/ARCHITECTURE.md",
+		"created: .replworks/TASKS.md",
+	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout = %q, want it to contain %q", stdout, want)
 		}
@@ -167,22 +197,31 @@ func TestInitAgainstTheLiveSourceCreatesAGENTSMDWhenReplworksExists(t *testing.T
 		t.Fatal("AGENTS.md does not hold the live canonical AGENTS.md")
 	}
 
-	for _, text := range []string{"created: AGENTS.md", "skipped: .replworks"} {
+	for _, text := range []string{
+		"created: AGENTS.md",
+		"skipped: .replworks",
+		"created: .replworks/PRODUCT_SPEC.md",
+		"created: .replworks/TECH_STACK.md",
+		"created: .replworks/ARCHITECTURE.md",
+		"created: .replworks/TASKS.md",
+	} {
 		if !strings.Contains(stdout, text) {
 			t.Fatalf("stdout = %q, want it to contain %q", stdout, text)
 		}
 	}
 }
 
-func TestInitAgainstTheLiveSourceSkipsBothExistingItems(t *testing.T) {
+func TestInitAgainstTheLiveSourceSkipsEveryExistingItem(t *testing.T) {
 	liveCanonical(t)
 
 	dir := t.TempDir()
 	if err := os.Mkdir(filepath.Join(dir, ".replworks"), 0o755); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".replworks", "PRODUCT_SPEC.md"), []byte("# spec\n"), 0o644); err != nil {
-		t.Fatalf("setup: %v", err)
+	for _, document := range []string{"PRODUCT_SPEC.md", "TECH_STACK.md", "ARCHITECTURE.md", "TASKS.md"} {
+		if err := os.WriteFile(filepath.Join(dir, ".replworks", document), []byte(document+"\n"), 0o644); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
 	}
 	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("mine\n"), 0o644); err != nil {
 		t.Fatalf("setup: %v", err)
@@ -203,7 +242,66 @@ func TestInitAgainstTheLiveSourceSkipsBothExistingItems(t *testing.T) {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
 	}
 
-	for _, want := range []string{"skipped: AGENTS.md", "skipped: .replworks"} {
+	for _, want := range []string{
+		"skipped: AGENTS.md",
+		"skipped: .replworks",
+		"skipped: .replworks/PRODUCT_SPEC.md",
+		"skipped: .replworks/TECH_STACK.md",
+		"skipped: .replworks/ARCHITECTURE.md",
+		"skipped: .replworks/TASKS.md",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("stdout = %q, want it to contain %q", stdout, want)
+		}
+	}
+}
+
+func TestInitAgainstTheLiveSourceCreatesOnlyTheMissingDocuments(t *testing.T) {
+	liveCanonical(t)
+
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, ".replworks"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	existing := "# My own TECH_STACK.md\n"
+	if err := os.WriteFile(filepath.Join(dir, ".replworks", "TECH_STACK.md"), []byte(existing), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	code, stdout, stderr := runCommand(t, nil, "init")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, ".replworks", "TECH_STACK.md"))
+	if err != nil {
+		t.Fatalf("reading TECH_STACK.md: %v", err)
+	}
+	if string(content) != existing {
+		t.Fatalf("TECH_STACK.md = %q, want the existing content byte for byte", content)
+	}
+
+	for _, document := range []string{"PRODUCT_SPEC.md", "ARCHITECTURE.md", "TASKS.md"} {
+		info, err := os.Stat(filepath.Join(dir, ".replworks", document))
+		if err != nil {
+			t.Fatalf("stat %s: %v", document, err)
+		}
+		if info.Size() != 0 {
+			t.Fatalf("%s size = %d, want 0", document, info.Size())
+		}
+	}
+
+	for _, want := range []string{
+		"skipped: .replworks/TECH_STACK.md",
+		"created: .replworks/PRODUCT_SPEC.md",
+		"created: .replworks/ARCHITECTURE.md",
+		"created: .replworks/TASKS.md",
+	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout = %q, want it to contain %q", stdout, want)
 		}

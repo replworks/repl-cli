@@ -16,8 +16,8 @@ import (
 func (r *runner) newInitCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
-		Short: "Create AGENTS.md and the .replworks directory",
-		Long:  "init writes the canonical AGENTS.md into the project directory and creates the .replworks directory. Existing entries are left unchanged.",
+		Short: "Create AGENTS.md and the REPL Works documents",
+		Long:  "init writes the canonical AGENTS.md into the project directory, creates the .replworks directory, and creates the four authoritative documents under it as empty files. Existing entries are left unchanged.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			document, err := selectDocument(cmd)

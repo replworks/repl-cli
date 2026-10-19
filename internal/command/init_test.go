@@ -256,19 +256,44 @@ func TestInitCreatesAgentsAndReplworks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading .replworks: %v", err)
 	}
-	if len(inside) != 0 {
-		t.Fatalf(".replworks holds %d entries, want none", len(inside))
+	if len(inside) != 4 {
+		t.Fatalf(".replworks holds %d entries, want 4", len(inside))
 	}
 
 	if got := transport.requested(); len(got) != 1 {
 		t.Fatalf("requests = %q, want 1", got)
 	}
 
-	for _, want := range []string{"created: AGENTS.md", "created: .replworks"} {
+	documents := []string{
+		".replworks/PRODUCT_SPEC.md",
+		".replworks/TECH_STACK.md",
+		".replworks/ARCHITECTURE.md",
+		".replworks/TASKS.md",
+	}
+	for _, document := range documents {
+		content, err := os.ReadFile(filepath.Join(dir, document))
+		if err != nil {
+			t.Fatalf("reading %s: %v", document, err)
+		}
+		if len(content) != 0 {
+			t.Fatalf("%s = %q, want an empty file", document, content)
+		}
+	}
+
+	for _, want := range append([]string{"created: AGENTS.md", "created: .replworks"}, prefixAll("created: ", documents)...) {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout = %q, want it to contain %q", stdout, want)
 		}
 	}
+}
+
+func prefixAll(prefix string, values []string) []string {
+	prefixed := make([]string, len(values))
+	for i, value := range values {
+		prefixed[i] = prefix + value
+	}
+
+	return prefixed
 }
 
 func TestInitLeavesExistingEntriesUnchanged(t *testing.T) {
@@ -278,6 +303,11 @@ func TestInitLeavesExistingEntriesUnchanged(t *testing.T) {
 	}
 	if err := os.Mkdir(filepath.Join(dir, ".replworks"), 0o755); err != nil {
 		t.Fatalf("setup: %v", err)
+	}
+	for _, document := range []string{"PRODUCT_SPEC.md", "TECH_STACK.md", "ARCHITECTURE.md", "TASKS.md"} {
+		if err := os.WriteFile(filepath.Join(dir, ".replworks", document), []byte(document+"\n"), 0o644); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
 	}
 	t.Chdir(dir)
 
@@ -293,7 +323,14 @@ func TestInitLeavesExistingEntriesUnchanged(t *testing.T) {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
 	}
 
-	for _, want := range []string{"skipped: AGENTS.md", "skipped: .replworks"} {
+	for _, want := range []string{
+		"skipped: AGENTS.md",
+		"skipped: .replworks",
+		"skipped: .replworks/PRODUCT_SPEC.md",
+		"skipped: .replworks/TECH_STACK.md",
+		"skipped: .replworks/ARCHITECTURE.md",
+		"skipped: .replworks/TASKS.md",
+	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout = %q, want it to contain %q", stdout, want)
 		}
@@ -327,6 +364,23 @@ func TestInitCreatesTheMissingEntryOnly(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "created: .replworks") {
 		t.Fatalf("stdout = %q, want it to report the created directory", stdout)
+	}
+	for _, document := range []string{
+		".replworks/PRODUCT_SPEC.md",
+		".replworks/TECH_STACK.md",
+		".replworks/ARCHITECTURE.md",
+		".replworks/TASKS.md",
+	} {
+		info, err := os.Stat(filepath.Join(dir, document))
+		if err != nil {
+			t.Fatalf("stat %s: %v", document, err)
+		}
+		if info.Size() != 0 {
+			t.Fatalf("%s size = %d, want 0", document, info.Size())
+		}
+		if !strings.Contains(stdout, "created: "+document) {
+			t.Fatalf("stdout = %q, want it to report %s as created", stdout, document)
+		}
 	}
 }
 
@@ -393,8 +447,13 @@ func TestInitSkipsEntriesOfAnyKind(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(dir, "AGENTS.md"), 0o755); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".replworks"), []byte("not a directory\n"), 0o644); err != nil {
+	if err := os.Mkdir(filepath.Join(dir, ".replworks"), 0o755); err != nil {
 		t.Fatalf("setup: %v", err)
+	}
+	for _, document := range []string{"PRODUCT_SPEC.md", "TECH_STACK.md", "ARCHITECTURE.md", "TASKS.md"} {
+		if err := os.Mkdir(filepath.Join(dir, ".replworks", document), 0o755); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
 	}
 	t.Chdir(dir)
 
@@ -413,7 +472,14 @@ func TestInitSkipsEntriesOfAnyKind(t *testing.T) {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
 	}
 
-	for _, want := range []string{"skipped: AGENTS.md", "skipped: .replworks"} {
+	for _, want := range []string{
+		"skipped: AGENTS.md",
+		"skipped: .replworks",
+		"skipped: .replworks/PRODUCT_SPEC.md",
+		"skipped: .replworks/TECH_STACK.md",
+		"skipped: .replworks/ARCHITECTURE.md",
+		"skipped: .replworks/TASKS.md",
+	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout = %q, want it to contain %q", stdout, want)
 		}

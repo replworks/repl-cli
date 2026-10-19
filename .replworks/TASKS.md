@@ -252,6 +252,17 @@
     - No test or production code references the removed HTML fixture.
     - The default test suite and static verification commands pass.
 
+- [X] T-025 Create the four authoritative documents with init
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-003, FR-004, FR-005, FR-006, FR-007, FR-036); § User Interface / Commands (EL-001); § Acceptance Criteria (AC-003, AC-039, AC-040); ARCHITECTURE.md § Components (C2)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live canonical source is observed as in T-005.
+    - An E2E test exercises init through the live canonical source. Given an empty directory, `.replworks/PRODUCT_SPEC.md`, `.replworks/TECH_STACK.md`, `.replworks/ARCHITECTURE.md`, and `.replworks/TASKS.md` exist with zero bytes, and each is reported as created.
+    - Given a `.replworks/` directory containing some but not all of the four documents, each missing document is created empty, each existing document is unchanged and reported as skipped, and the exit code is 0.
+    - No file or directory other than AGENTS.md, `.replworks/`, and the four documents exists afterward.
+    - Existing init behavior from T-005, T-006, T-007, and T-021 remains passing.
+    - Unit tests for the Init Coordinator item order, creation, and skip logic pass.
+
 - [X] T-021 Select the AGENTS.md document during init
   - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-001 through FR-007); § Error Conditions (ERR-006); § Acceptance Criteria (AC-001, AC-002, AC-003, AC-022, AC-033, AC-034, AC-035); ARCHITECTURE.md § Components (C1, C2, C7)
   - External boundary: yes
