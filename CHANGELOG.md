@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.2.1 - 2026-10-19
+
+### What's Changed
+
+* feat: create the four authoritative documents with init by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/33
+
+**Full Changelog**: https://github.com/replworks/repl-cli/compare/v0.2.0...v0.2.1
+
 ## v0.2.0 - 2026-10-18
 
 ### What's Changed
