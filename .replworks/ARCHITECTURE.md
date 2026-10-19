@@ -82,8 +82,8 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
 - Responsibilities:
   - Obtain the Canonical Text for the selected init document first.
   - Make no write when the Canonical Text is `Failed`.
-  - Process items in this order: AGENTS.md, then the `.replworks/` directory.
-  - Mark an item `skipped` when it is present. Otherwise create it (AGENTS.md with the Canonical Text, the directory empty).
+  - Process items in this order: AGENTS.md, then the `.replworks/` directory, then `.replworks/PRODUCT_SPEC.md`, `.replworks/TECH_STACK.md`, `.replworks/ARCHITECTURE.md`, `.replworks/TASKS.md`.
+  - Mark an item `skipped` when it is present. Otherwise create it (AGENTS.md with the Canonical Text, the directory, and each document as an empty file).
   - Create nothing else.
   - Stop at the first write failure.
 - Inputs: Request with the selected document source, Canonical Text fact, Workspace presence facts.

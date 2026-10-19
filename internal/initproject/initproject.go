@@ -1,4 +1,4 @@
-// Package initproject creates AGENTS.md and the .replworks directory.
+// Package initproject creates AGENTS.md and the .replworks directory with its authoritative documents.
 package initproject
 
 import (
@@ -8,9 +8,23 @@ import (
 )
 
 const (
-	agentsPath    = "AGENTS.md"
-	replworksPath = ".replworks"
+	agentsPath       = "AGENTS.md"
+	replworksPath    = ".replworks"
+	productSpecPath  = ".replworks/PRODUCT_SPEC.md"
+	techStackPath    = ".replworks/TECH_STACK.md"
+	architecturePath = ".replworks/ARCHITECTURE.md"
+	tasksPath        = ".replworks/TASKS.md"
 )
+
+// itemPaths is the order in which init processes entries.
+var itemPaths = []string{
+	agentsPath,
+	replworksPath,
+	productSpecPath,
+	techStackPath,
+	architecturePath,
+	tasksPath,
+}
 
 // CanonicalSource provides the canonical AGENTS.md.
 type CanonicalSource interface {
@@ -48,7 +62,7 @@ func (c Coordinator) Run() Outcome {
 
 	var outcome Outcome
 
-	for _, path := range []string{agentsPath, replworksPath} {
+	for _, path := range itemPaths {
 		exists := c.Workspace.Exists(path)
 		if exists.IsFailed() {
 			outcome.Errors = append(outcome.Errors, exists.Reason())
@@ -61,10 +75,13 @@ func (c Coordinator) Run() Outcome {
 		}
 
 		var err error
-		if path == replworksPath {
+		switch path {
+		case replworksPath:
 			err = c.Workspace.CreateDirectory(path)
-		} else {
+		case agentsPath:
 			err = c.Workspace.CreateFile(path, canonical.Value())
+		default:
+			err = c.Workspace.CreateFile(path, "")
 		}
 		if err != nil {
 			outcome.Errors = append(outcome.Errors, err)
