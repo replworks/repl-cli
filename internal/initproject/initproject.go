@@ -14,6 +14,8 @@ const (
 	techStackPath    = ".replworks/TECH_STACK.md"
 	architecturePath = ".replworks/ARCHITECTURE.md"
 	tasksPath        = ".replworks/TASKS.md"
+	scriptsPath      = ".replworks/scripts"
+	askHumanPath     = ".replworks/scripts/ask-human.sh"
 )
 
 // itemPaths is the order in which init processes entries.
@@ -36,12 +38,14 @@ type Writer interface {
 	Exists(rel string) fact.Fact[bool]
 	CreateFile(rel, content string) error
 	CreateDirectory(rel string) error
+	DeleteFile(rel string) error
 }
 
 // Item reports one managed entry.
 type Item struct {
 	Path    string
 	Created bool
+	Deleted bool
 }
 
 type Outcome struct {
@@ -50,14 +54,33 @@ type Outcome struct {
 }
 
 type Coordinator struct {
-	Source    CanonicalSource
-	Workspace Writer
+	Source       CanonicalSource
+	Script       CanonicalSource
+	ManageScript bool
+	Workspace    Writer
 }
 
 func (c Coordinator) Run() Outcome {
 	canonical := c.Source.Canonical()
 	if !canonical.IsPresent() {
 		return Outcome{Errors: []error{canonicalReason(canonical)}}
+	}
+
+	scriptExists := false
+	scriptContent := ""
+	if c.ManageScript {
+		exists := c.Workspace.Exists(askHumanPath)
+		if exists.IsFailed() {
+			return Outcome{Errors: []error{exists.Reason()}}
+		}
+		scriptExists = exists.Value()
+	}
+	if c.ManageScript && c.Script != nil && !scriptExists {
+		script := c.Script.Canonical()
+		if !script.IsPresent() {
+			return Outcome{Errors: []error{canonicalReason(script)}}
+		}
+		scriptContent = script.Value()
 	}
 
 	var outcome Outcome
@@ -90,6 +113,46 @@ func (c Coordinator) Run() Outcome {
 
 		outcome.Items = append(outcome.Items, Item{Path: path, Created: true})
 	}
+
+	if c.ManageScript && c.Script == nil {
+		if scriptExists {
+			if err := c.Workspace.DeleteFile(askHumanPath); err != nil {
+				outcome.Errors = append(outcome.Errors, err)
+				return outcome
+			}
+			outcome.Items = append(outcome.Items, Item{Path: askHumanPath, Deleted: true})
+		}
+		return outcome
+	}
+
+	if !c.ManageScript {
+		return outcome
+	}
+
+	scriptsExists := c.Workspace.Exists(scriptsPath)
+	if scriptsExists.IsFailed() {
+		outcome.Errors = append(outcome.Errors, scriptsExists.Reason())
+		return outcome
+	}
+	if scriptsExists.Value() {
+		outcome.Items = append(outcome.Items, Item{Path: scriptsPath})
+	} else {
+		if err := c.Workspace.CreateDirectory(scriptsPath); err != nil {
+			outcome.Errors = append(outcome.Errors, err)
+			return outcome
+		}
+		outcome.Items = append(outcome.Items, Item{Path: scriptsPath, Created: true})
+	}
+
+	if scriptExists {
+		outcome.Items = append(outcome.Items, Item{Path: askHumanPath})
+		return outcome
+	}
+	if err := c.Workspace.CreateFile(askHumanPath, scriptContent); err != nil {
+		outcome.Errors = append(outcome.Errors, err)
+		return outcome
+	}
+	outcome.Items = append(outcome.Items, Item{Path: askHumanPath, Created: true})
 
 	return outcome
 }

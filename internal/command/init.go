@@ -31,14 +31,24 @@ func (r *runner) newInitCommand() *cobra.Command {
 			}
 
 			outcome := initproject.Coordinator{
-				Source:    r.canonical(document),
-				Workspace: workspace.GrantWrite(workspace.New(dir)),
+				Source:       r.canonical(document),
+				Script:       initScriptSource(r, document),
+				ManageScript: true,
+				Workspace:    workspace.GrantWrite(workspace.New(dir)),
 			}.Run()
 			r.status = renderInit(cmd, outcome)
 
 			return nil
 		},
 	}
+}
+
+func initScriptSource(r *runner, document canon.Document) initproject.CanonicalSource {
+	if document == canon.AgentsAutoDocument {
+		return r.askHumanScript()
+	}
+
+	return nil
 }
 
 func selectDocument(cmd *cobra.Command) (canon.Document, error) {
@@ -76,6 +86,8 @@ func renderInit(cmd *cobra.Command, outcome initproject.Outcome) int {
 		state := "skipped"
 		if item.Created {
 			state = "created"
+		} else if item.Deleted {
+			state = "deleted"
 		}
 		_, _ = fmt.Fprintf(out, "%s: %s\n", state, item.Path)
 	}

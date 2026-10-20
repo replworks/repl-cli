@@ -16,6 +16,7 @@
 - **Project Directory**: the directory in which the command runs. All file access is confined to it.
 - **Authoritative Documents**: the five documents named in PRODUCT_SPEC.md.
 - **Canonical Text**: the canonical AGENTS.md content, obtained from the single published source defined in PRODUCT_SPEC.md.
+- **Helper Script Text**: the exact `ask-human.sh` content obtained from the published source defined in PRODUCT_SPEC.md.
 - **Task Ledger**: the ordered list of task entries parsed from one TASKS.md text.
 - **Task Entry**: a task ID plus a completion state, as recognized by the Task Ledger Reader.
 - **Mark**: one occurrence of the UNVERIFIED text within a heading line of an authoritative document.
@@ -81,12 +82,13 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
 
 - Responsibilities:
   - Obtain the Canonical Text for the selected init document first.
-  - Make no write when the Canonical Text is `Failed`.
-  - Process items in this order: AGENTS.md, then the `.replworks/` directory, then `.replworks/PRODUCT_SPEC.md`, `.replworks/TECH_STACK.md`, `.replworks/ARCHITECTURE.md`, `.replworks/TASKS.md`.
+  - When automatic-run is selected, obtain Helper Script Text before any write.
+  - Make no write when required source text is `Failed`.
+  - Process items in this order: AGENTS.md, then the `.replworks/` directory, then `.replworks/PRODUCT_SPEC.md`, `.replworks/TECH_STACK.md`, `.replworks/ARCHITECTURE.md`, `.replworks/TASKS.md`, then the helper-script state.
   - Mark an item `skipped` when it is present. Otherwise create it (AGENTS.md with the Canonical Text, the directory, and each document as an empty file).
-  - Create nothing else.
+  - For standard selection, remove an existing helper script. For automatic-run selection, create the helper-script directory and file only when absent; never replace an existing helper script.
   - Stop at the first write failure.
-- Inputs: Request with the selected document source, Canonical Text fact, Workspace presence facts.
+- Inputs: Request with the selected document source, Canonical Text fact, optional Helper Script Text fact, and Workspace presence facts.
 - Outputs: Outcome with one `(item path, created | skipped)` entry per processed item, and execution errors.
 - Ownership boundaries:
   - Owns the item order and the created/skipped decision.
@@ -132,9 +134,9 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
   - Only after that, obtain the Canonical Text for the selected sync document. Record an execution error and stop when it is `Failed`.
   - Compare local text and Canonical Text for exact equality.
   - When equal: return `UpToDate` and make no write.
-  - When different: obtain the difference from the Difference Calculator, then replace the AGENTS.md content with the Canonical Text.
+  - When different: obtain the difference from the Difference Calculator, obtain Helper Script Text only for automatic-run selection, then replace AGENTS.md and adjust helper-script state.
   - When replacement fails: keep the computed difference in the Outcome and record an execution error.
-- Inputs: Request with the selected document source, local AGENTS.md fact, Canonical Text fact.
+- Inputs: Request with the selected document source, local AGENTS.md fact, Canonical Text fact, optional Helper Script Text fact, and helper-script presence fact.
 - Outputs: Outcome with `UpToDate | Replaced(difference) | ReplaceFailed(difference)`, and execution errors.
 - Ownership boundaries:
   - Owns the order of local check, retrieval, comparison, difference, replacement.
@@ -146,7 +148,7 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
 - Responsibilities:
   - Provide the only access to files in the Project Directory.
   - `Read` operations: report presence of a path, read the text of a path. Each returns `Present | Absent | Failed`.
-  - `Write` operations: create a file only when absent, create a directory only when absent, replace a file's whole content.
+  - `Write` operations: create a file only when absent, create a directory only when absent, replace a file's whole content, and delete a known-present file.
   - Judge presence by the existence of an entry at the path, regardless of entry kind.
   - Reject any path outside the Project Directory.
   - Report write success only when the full new content is stored.
@@ -160,16 +162,16 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
 ### C7. Canonical Document Provider
 
 - Responsibilities:
-  - Obtain the Canonical Text from the source selected by the request. The allowed sources are the two published Markdown documents in PRODUCT_SPEC.md.
-  - Return the Canonical Text exactly as the canonical content, with no normalization.
-  - Retrieve at most once per invocation. Later requests in the same invocation reuse the first result, including a failure.
+  - Obtain Canonical Text from the source selected by the request, and Helper Script Text from its published source when requested. The allowed sources are those listed in PRODUCT_SPEC.md.
+  - Return each text exactly as the source content, with no normalization.
+  - Retrieve each requested source at most once per invocation. Later requests in the same invocation reuse the first result, including a failure.
   - Treat these as `Failed`: source unreachable, unsuccessful response, or an empty response from the source.
   - Keep the source's representation private. Other components never see it.
-- Inputs: a source selection. Init supplies the user's selection; commands without a selection use PRODUCT_SPEC.md's default canonical document.
-- Outputs: `Present(Canonical Text) | Failed(reason)`.
+  - Inputs: a source selection and, when needed, the helper-script URL. Init and sync supply the user's selection; commands without a selection use PRODUCT_SPEC.md's default canonical document.
+  - Outputs: `Present(text) | Failed(reason)`.
 - Ownership boundaries:
   - Owns all network access and the extraction of the Canonical Text.
-  - Does not compare, write, print, or access any address other than the canonical source.
+  - Does not compare, write, print, or access any address other than the requested canonical sources.
 
 ### C8. Base Branch Reader
 
@@ -321,9 +323,9 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
 Request → Init Coordinator
   Command Interface → validated document selection
   Canonical Document Provider(selection) → Canonical Text fact
+  [automatic-run] → Helper Script Text fact
   [Failed] → Outcome(error), no write
-  [Present] → Workspace presence(AGENTS.md), presence(.replworks/)
-             → Workspace Write: create absent items
+  [Present] → Workspace presence and writes for the standard items and helper-script state
   → Outcome(items, errors) → Command Interface → lines + status
 ```
 
@@ -362,7 +364,8 @@ Request → Sync Coordinator
   exact comparison
     equal → Outcome(UpToDate)
     different → Difference Calculator → difference
-              → Workspace Write: replace AGENTS.md
+              → [automatic-run] Helper Script Text fact
+              → Workspace Write: replace AGENTS.md and adjust helper-script state
               → Outcome(Replaced | ReplaceFailed, difference)
   → Command Interface → lines + status
 ```
@@ -375,10 +378,10 @@ Request → Sync Coordinator
 
 ### Output line content (owned by Command Interface)
 
-- init: one line per processed item, containing the item path and whether it was created or skipped.
+- init: one line per processed item, containing the item path and whether it was created, skipped, or deleted.
 - status: complete count, total count, and first incomplete task ID or a no-incomplete-task indication.
 - check: violation lines first (Rule Evaluator order), then execution error lines (gathering order). A violation line contains rule identifier, file path, message. An error line contains the subject and message.
-- sync: an up-to-date indication, or the difference lines followed by any error line.
+- sync: an up-to-date indication, or the difference lines, helper-script state line when changed, followed by any error line.
 - sync difference lines: removed lines are red and added lines are green for terminal output; non-terminal output is plain.
 - All paths printed are relative to the Project Directory.
 

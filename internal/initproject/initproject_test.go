@@ -74,6 +74,14 @@ func (f *fakeWriter) CreateDirectory(rel string) error {
 	return nil
 }
 
+func (f *fakeWriter) DeleteFile(rel string) error {
+	f.events = append(f.events, "delete-file "+rel)
+	delete(f.files, rel)
+	f.present[rel] = false
+
+	return nil
+}
+
 func (f *fakeWriter) trace() string {
 	return strings.Join(f.events, ", ")
 }
@@ -258,6 +266,25 @@ func TestRunFailsWhenTheCanonicalTextCannotBeObtainedEvenWhenAGENTSExists(t *tes
 	}
 	if len(writer.events) > 0 {
 		t.Fatalf("the project directory was examined before the canonical text was obtained: %q", writer.trace())
+	}
+}
+
+func TestRunDoesNotWriteWhenTheAutomaticScriptCannotBeObtained(t *testing.T) {
+	failure := errors.New("the helper script is unreachable")
+	writer := newFakeWriter()
+
+	outcome := Coordinator{
+		Source:       newSource(),
+		Script:       &fakeSource{canonical: fact.Failed[string](failure)},
+		ManageScript: true,
+		Workspace:    writer,
+	}.Run()
+
+	if len(outcome.Errors) != 1 || !errors.Is(outcome.Errors[0], failure) {
+		t.Fatalf("errors = %v, want the helper-script failure", outcome.Errors)
+	}
+	if len(writer.events) != 1 || writer.events[0] != "exists .replworks/scripts/ask-human.sh" {
+		t.Fatalf("events = %q, want only the helper-script presence check", writer.events)
 	}
 }
 

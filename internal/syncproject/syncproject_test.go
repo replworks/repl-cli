@@ -34,6 +34,26 @@ func (f *fakeWorkspace) ReadText(rel string) fact.Fact[string] {
 	return f.local
 }
 
+func (f *fakeWorkspace) Exists(rel string) fact.Fact[bool] {
+	f.events = append(f.events, "exists "+rel)
+	return fact.Present(false)
+}
+
+func (f *fakeWorkspace) CreateDirectory(rel string) error {
+	f.events = append(f.events, "create-directory "+rel)
+	return nil
+}
+
+func (f *fakeWorkspace) CreateFile(rel, content string) error {
+	f.events = append(f.events, "create-file "+rel)
+	return nil
+}
+
+func (f *fakeWorkspace) DeleteFile(rel string) error {
+	f.events = append(f.events, "delete-file "+rel)
+	return nil
+}
+
 func (f *fakeWorkspace) ReplaceFile(rel, content string) error {
 	f.events = append(f.events, "replace "+rel)
 	if f.replaceErr != nil {
@@ -144,6 +164,23 @@ func TestRunFailsWhenTheCanonicalTextCannotBeObtained(t *testing.T) {
 	}
 	if workspace.trace() != "read AGENTS.md" {
 		t.Fatalf("trace = %q, want the local read to happen first", workspace.trace())
+	}
+}
+
+func TestRunDoesNotReplaceAGENTSWhenTheAutomaticScriptCannotBeObtained(t *testing.T) {
+	failure := errors.New("the helper script is unreachable")
+	coord, _, workspace := coordinator(fact.Present("old\n"), fact.Present("new\n"))
+	coord.ManageScript = true
+	coord.Auto = true
+	coord.Script = &fakeSource{canonical: fact.Failed[string](failure)}
+
+	outcome := coord.Run()
+
+	if len(outcome.Errors) != 1 || !errors.Is(outcome.Errors[0], failure) {
+		t.Fatalf("errors = %v, want the helper-script failure", outcome.Errors)
+	}
+	if len(workspace.replaced) > 0 {
+		t.Fatalf("replaced = %q, want no replacement", workspace.replaced)
 	}
 }
 

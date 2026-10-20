@@ -39,6 +39,8 @@
 - Canonical AGENTS.md documents:
   - https://www.repl.net/documents/agents.md
   - https://www.repl.net/documents/agents-auto.md
+- Automatic-run helper script:
+  - https://www.repl.net/scripts/ask-human.sh
 - Init document selection: the document selected interactively for the current `repl init` invocation. The selection is not persisted.
 - Default canonical document: `https://www.repl.net/documents/agents.md`, used by commands that do not receive a document selection, currently `repl check`.
 - Authoritative documents: the five files AGENTS.md, .replworks/PRODUCT_SPEC.md, .replworks/TECH_STACK.md, .replworks/ARCHITECTURE.md, .replworks/TASKS.md.
@@ -55,6 +57,7 @@
 - Text lines printed by commands.
 - Exit code of each command.
 - AGENTS.md file and .replworks/ directory created by repl init.
+- `.replworks/scripts/ask-human.sh` created or removed by the selected init/sync mode.
 - AGENTS.md file replaced by repl sync.
 
 ## Constraints
@@ -67,6 +70,8 @@
   - Relied behavior: serves the default canonical AGENTS.md content and the first init option.
 - https://www.repl.net/documents/agents-auto.md
   - Relied behavior: serves the automatic-run AGENTS.md content and the second init option.
+- https://www.repl.net/scripts/ask-human.sh
+  - Relied behavior: serves the exact script content installed for automatic-run projects.
 - Git repository of the project directory
   - Relied behavior: provides the content of TASKS.md on the base branch.
 
@@ -80,7 +85,7 @@
 - EL-001: repl init
   - Purpose: create AGENTS.md, the .replworks/ directory, and the four authoritative documents under .replworks/ in the project directory.
   - Input: an interactive selection of one of the two published AGENTS.md documents.
-  - Output: one line per created item and one line per skipped item, each containing the item path.
+  - Output: one line per created, skipped, or deleted item, each containing the item path.
   - Exit: 0 on completion, 2 on execution error.
 - EL-002: repl status
   - Purpose: show task progress.
@@ -117,12 +122,14 @@
 
 - FR-001: repl init MUST present the user with exactly these choices, in this order: `https://www.repl.net/documents/agents.md` and `https://www.repl.net/documents/agents-auto.md`, then create AGENTS.md with the content of the selected document when AGENTS.md does not exist.
 - FR-002: repl init MUST create the .replworks/ directory in the project directory when it does not exist.
-- FR-003: repl init MUST NOT modify an existing file.
-- FR-004: repl init MUST NOT create any file or directory other than AGENTS.md, .replworks/, and the four documents defined in FR-036.
+- FR-003: repl init MUST NOT modify an existing file except that selecting the standard AGENTS document MUST remove an existing `.replworks/scripts/ask-human.sh`.
+- FR-004: repl init MUST NOT create any file or directory other than AGENTS.md, .replworks/, the four documents defined in FR-036, and `.replworks/scripts/ask-human.sh` plus its parent directory when the automatic-run document is selected.
 - FR-005: repl init MUST print the path of each item it created.
 - FR-006: repl init MUST print the path of each item it skipped because the item already exists.
 - FR-007: repl init MUST exit with code 0 when it completes, including when it skipped items.
 - FR-036: repl init MUST create .replworks/PRODUCT_SPEC.md, .replworks/TECH_STACK.md, .replworks/ARCHITECTURE.md, and .replworks/TASKS.md as empty files when they do not exist.
+- FR-037: When the automatic-run document is selected, repl init MUST create `.replworks/scripts/ask-human.sh` from the exact response text at `https://www.repl.net/scripts/ask-human.sh` when the file does not exist, and MUST leave an existing file unchanged.
+- FR-038: When the standard AGENTS document is selected, repl init MUST remove `.replworks/scripts/ask-human.sh` when it exists.
 
 ### status
 
@@ -156,12 +163,14 @@
 - FR-029: repl sync MUST print an indication that AGENTS.md is up to date when its content is identical to the selected document.
 - FR-030: repl sync MUST print the line-by-line difference between the local AGENTS.md and the selected document when the contents differ.
 - FR-031: repl sync MUST replace the content of AGENTS.md with the selected document's content when the contents differ.
+- FR-039: When repl sync replaces AGENTS.md because its contents differ, selecting the automatic-run document MUST create the helper script from the exact script response when the script does not exist, and selecting the standard document MUST remove the helper script when it exists.
+- FR-040: When AGENTS.md content is identical to the selected document, repl sync MUST NOT create, modify, or remove the helper script.
 - FR-035: repl sync MUST render removed difference lines in red and added difference lines in green when its output is a terminal, and MUST render plain difference lines otherwise.
 
 ### all commands
 
 - FR-032: Every command MUST operate only on the project directory.
-- FR-033: repl-cli MUST NOT access any network resource other than https://www.repl.net/documents/agents.md and https://www.repl.net/documents/agents-auto.md.
+- FR-033: repl-cli MUST NOT access any network resource other than the two published AGENTS documents and `https://www.repl.net/scripts/ask-human.sh`.
 - FR-034: Only repl init and repl sync MUST write files.
 
 ## User Flows
@@ -238,6 +247,10 @@
 - AC-019: Given a project directory, when repl check runs, then no file is modified. (FR-019, EL-003)
 - AC-020: Given an AGENTS.md identical to the selected document, when repl sync runs, then the file is unmodified, the output indicates that AGENTS.md is up to date, and the exit code is 0. (FR-027, FR-028, FR-031, EL-005)
 - AC-021: Given an AGENTS.md that differs from the selected document, when repl sync runs, then the output contains the line-by-line difference, AGENTS.md equals the selected document, and the exit code is 0. (FR-027, FR-029, FR-030, FR-031, EL-005)
+- AC-041: Given an empty directory and automatic-run selection, repl init creates `.replworks/scripts/ask-human.sh` with the exact live script response.
+- AC-042: Given an existing helper script and standard selection, repl init removes the helper script while leaving an existing AGENTS.md unchanged.
+- AC-043: Given differing AGENTS.md content, repl sync creates the missing helper script for automatic-run selection or removes an existing helper script for standard selection.
+- AC-044: Given identical AGENTS.md content, repl sync leaves the helper script state unchanged and does not request the script URL.
 - AC-022: Given that the selected init document is unreachable, when repl init runs, then no file is created or modified, an error line is printed, and the exit code is 2. (ERR-001, EL-001)
 - AC-023: Given that the selected sync document is unreachable, when repl sync runs, then AGENTS.md is unmodified, an error line is printed, and the exit code is 2. (ERR-001, EL-005)
 - AC-024: Given that https://www.repl.net/documents/agents.md is unreachable and a violation of rule documents-exist exists, when repl check runs, then the violation is reported, an error line is printed, and the exit code is 2. (ERR-001, FR-026, EL-003)

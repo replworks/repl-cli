@@ -17,6 +17,17 @@ func liveCanonical(t *testing.T) string {
 	return liveDocument(t, canon.AgentsDocument)
 }
 
+func liveAskHumanScript(t *testing.T) string {
+	t.Helper()
+
+	script := canon.NewForURL(nil, string(canon.AskHumanScript)).Canonical()
+	if !script.IsPresent() {
+		t.Fatalf("the live ask-human script source is unreachable: %v", script.Reason())
+	}
+
+	return script.Value()
+}
+
 func liveDocument(t *testing.T, document canon.Document) string {
 	t.Helper()
 
@@ -33,6 +44,7 @@ func liveDocument(t *testing.T, document canon.Document) string {
 
 func TestInitAgainstTheLiveAutomaticSource(t *testing.T) {
 	want := liveDocument(t, canon.AgentsAutoDocument)
+	wantScript := liveAskHumanScript(t)
 
 	dir := t.TempDir()
 	t.Chdir(dir)
@@ -51,6 +63,13 @@ func TestInitAgainstTheLiveAutomaticSource(t *testing.T) {
 	}
 	if string(content) != want {
 		t.Fatal("AGENTS.md does not hold the selected live AGENTS.md")
+	}
+	script, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh"))
+	if err != nil {
+		t.Fatalf("reading ask-human.sh: %v", err)
+	}
+	if string(script) != wantScript {
+		t.Fatal("ask-human.sh does not hold the exact live script")
 	}
 	if info, err := os.Stat(filepath.Join(dir, ".replworks")); err != nil || !info.IsDir() {
 		t.Fatalf("stat .replworks: %v, want a directory", err)

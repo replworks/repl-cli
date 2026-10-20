@@ -82,6 +82,21 @@ func TestCreateDirectory(t *testing.T) {
 	}
 }
 
+func TestDeleteFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ask-human.sh")
+	if err := os.WriteFile(path, []byte("script\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	if err := GrantWrite(New(dir)).DeleteFile("ask-human.sh"); err != nil {
+		t.Fatalf("DeleteFile() error = %v, want nil", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("stat deleted file: %v, want not exist", err)
+	}
+}
+
 func TestCreateDirectoryFailsWhenTheDirectoryExists(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.Mkdir(filepath.Join(dir, ".replworks"), 0o755); err != nil {
