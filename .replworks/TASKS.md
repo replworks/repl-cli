@@ -275,3 +275,14 @@
     - If the input ends or fails before a valid selection, one error line is printed, the exit code is 2, and nothing is created or modified.
     - Existing-item skip behavior and init write-failure behavior from T-006 and T-007 remain passing for both selections.
     - Unit tests cover selection validation, source selection, and failure handling.
+
+- [X] T-026 Manage ask-human.sh for the selected AGENTS mode
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-003, FR-004, FR-037, FR-038); § Functional Requirements / sync (FR-039, FR-040); § Functional Requirements / all commands (FR-033); § Acceptance Criteria (AC-041 through AC-044); ARCHITECTURE.md § Components (C2, C5, C6, C7)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live script source at `https://www.repl.net/scripts/ask-human.sh` is observed and its response is stored byte-for-byte for automatic-run initialization and synchronization.
+    - Automatic-run init creates `.replworks/scripts/ask-human.sh` when absent and leaves an existing helper script unchanged.
+    - Standard init removes an existing helper script and leaves AGENTS.md unchanged when it already exists.
+    - Sync adjusts helper-script state only when AGENTS.md differs from the selected document; equal content performs no helper-script network request or file operation.
+    - A failed helper-script retrieval prevents writes to the project for init and prevents AGENTS.md replacement for sync.
+    - Unit tests cover helper-source retrieval, creation, deletion, skip behavior, and equal-content no-op behavior.

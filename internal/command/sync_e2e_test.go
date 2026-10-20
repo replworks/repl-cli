@@ -14,6 +14,7 @@ import (
 
 func TestSyncAgainstTheLiveAutomaticSource(t *testing.T) {
 	want := liveDocument(t, canon.AgentsAutoDocument)
+	wantScript := liveAskHumanScript(t)
 
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("# stale\n"), 0o644); err != nil {
@@ -35,6 +36,13 @@ func TestSyncAgainstTheLiveAutomaticSource(t *testing.T) {
 	}
 	if string(content) != want {
 		t.Fatal("AGENTS.md does not hold the selected live document")
+	}
+	script, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh"))
+	if err != nil {
+		t.Fatalf("reading ask-human.sh: %v", err)
+	}
+	if string(script) != wantScript {
+		t.Fatal("ask-human.sh does not hold the exact live script")
 	}
 }
 

@@ -155,8 +155,11 @@ func TestInitUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
 		t.Fatalf("AGENTS.md = %q, want %q", content, want)
 	}
 	requests := transport.requested()
-	if len(requests) != 1 || requests[0] != string(canon.AgentsAutoDocument) {
-		t.Fatalf("requests = %q, want one request to %q", requests, canon.AgentsAutoDocument)
+	if len(requests) != 2 || requests[0] != string(canon.AgentsAutoDocument) || requests[1] != string(canon.AskHumanScript) {
+		t.Fatalf("requests = %q, want AGENTS AUTO followed by %q", requests, canon.AskHumanScript)
+	}
+	if content, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh")); err != nil || string(content) != want {
+		t.Fatalf("ask-human.sh = %q, err = %v, want %q", content, err, want)
 	}
 }
 
@@ -178,8 +181,8 @@ func TestInitRepeatsAfterAnInvalidDocumentSelection(t *testing.T) {
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
-	if got := transport.requested(); len(got) != 1 || got[0] != string(canon.AgentsAutoDocument) {
-		t.Fatalf("requests = %q, want one request to %q", got, canon.AgentsAutoDocument)
+	if got := transport.requested(); len(got) != 2 || got[0] != string(canon.AgentsAutoDocument) || got[1] != string(canon.AskHumanScript) {
+		t.Fatalf("requests = %q, want AGENTS AUTO followed by %q", got, canon.AskHumanScript)
 	}
 	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
 	if err != nil {
@@ -568,5 +571,35 @@ func TestInitRejectsArguments(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "unknown command") && !strings.Contains(stderr, "accepts 0 arg") {
 		t.Fatalf("stderr = %q, want it to reject the extra argument", stderr)
+	}
+}
+
+func TestInitStandardSelectionRemovesTheAskHumanScript(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".replworks/scripts"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("keep\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh"), []byte("script\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, "# AGENTS.md\n")
+	code, stdout, stderr := runCommandWithInput(t, client, "1\n", "init")
+
+	if code != 0 || stderr != "" {
+		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".replworks/scripts/ask-human.sh")); !os.IsNotExist(err) {
+		t.Fatalf("ask-human.sh stat error = %v, want deleted", err)
+	}
+	if content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md")); err != nil || string(content) != "keep\n" {
+		t.Fatalf("AGENTS.md = %q, err = %v, want unchanged", content, err)
+	}
+	if !strings.Contains(stdout, "deleted: .replworks/scripts/ask-human.sh") {
+		t.Fatalf("stdout = %q, want deletion output", stdout)
 	}
 }

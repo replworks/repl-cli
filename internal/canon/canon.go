@@ -18,6 +18,7 @@ type Document string
 const (
 	AgentsDocument     Document = "https://www.repl.net/documents/agents.md"
 	AgentsAutoDocument Document = "https://www.repl.net/documents/agents-auto.md"
+	AskHumanScript     Document = "https://www.repl.net/scripts/ask-human.sh"
 	// SourceURL is the default document used by commands without a selection.
 	SourceURL = string(AgentsDocument)
 )
@@ -45,11 +46,17 @@ func New(client *http.Client) *Provider {
 // NewForDocument returns a Provider reading document. A nil client uses a
 // default client with a timeout.
 func NewForDocument(client *http.Client, document Document) *Provider {
+	return NewForURL(client, string(document))
+}
+
+// NewForURL returns a Provider reading url. A nil client uses a default client
+// with a timeout.
+func NewForURL(client *http.Client, url string) *Provider {
 	if client == nil {
 		client = &http.Client{Timeout: requestTimeout}
 	}
 
-	return &Provider{client: client, url: string(document)}
+	return &Provider{client: client, url: url}
 }
 
 // Canonical returns the canonical AGENTS.md. The source is contacted at most

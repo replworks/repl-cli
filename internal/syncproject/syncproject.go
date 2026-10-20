@@ -9,7 +9,12 @@ import (
 	"github.com/replworks/repl-cli/internal/fact"
 )
 
-const agentsPath = "AGENTS.md"
+const (
+	agentsPath    = "AGENTS.md"
+	replworksPath = ".replworks"
+	scriptsPath   = ".replworks/scripts"
+	askHumanPath  = ".replworks/scripts/ask-human.sh"
+)
 
 // CanonicalSource provides the canonical AGENTS.md.
 type CanonicalSource interface {
@@ -19,7 +24,11 @@ type CanonicalSource interface {
 // Workspace is the project directory with the Read and Write capabilities.
 type Workspace interface {
 	ReadText(rel string) fact.Fact[string]
+	Exists(rel string) fact.Fact[bool]
+	CreateDirectory(rel string) error
+	CreateFile(rel, content string) error
 	ReplaceFile(rel, content string) error
+	DeleteFile(rel string) error
 }
 
 // DifferenceCalculator computes the line-level difference between two texts.
@@ -31,15 +40,20 @@ type DifferenceCalculator interface {
 // up to date (UpToDate), replaced (Difference), or replacement failed
 // (Difference together with Errors).
 type Outcome struct {
-	UpToDate   bool
-	Difference []diff.Entry
-	Errors     []error
+	UpToDate    bool
+	Difference  []diff.Entry
+	ScriptPath  string
+	ScriptState string
+	Errors      []error
 }
 
 type Coordinator struct {
-	Source     CanonicalSource
-	Workspace  Workspace
-	Difference DifferenceCalculator
+	Source       CanonicalSource
+	Script       CanonicalSource
+	Auto         bool
+	ManageScript bool
+	Workspace    Workspace
+	Difference   DifferenceCalculator
 }
 
 func (c Coordinator) Run() Outcome {
@@ -62,11 +76,74 @@ func (c Coordinator) Run() Outcome {
 	}
 
 	difference := c.Difference.Compare(local.Value(), canonical.Value())
+
+	scriptExists := false
+	scriptContent := ""
+	if c.ManageScript {
+		exists := c.Workspace.Exists(askHumanPath)
+		if exists.IsFailed() {
+			return Outcome{Difference: difference, Errors: []error{exists.Reason()}}
+		}
+		scriptExists = exists.Value()
+	}
+	if c.ManageScript && c.Auto && c.Script != nil && !scriptExists {
+		script := c.Script.Canonical()
+		if !script.IsPresent() {
+			return Outcome{Difference: difference, Errors: []error{canonicalReason(script)}}
+		}
+		scriptContent = script.Value()
+	}
 	if err := c.Workspace.ReplaceFile(agentsPath, canonical.Value()); err != nil {
 		return Outcome{Difference: difference, Errors: []error{err}}
 	}
 
+	if c.ManageScript && !c.Auto {
+		if scriptExists {
+			if err := c.Workspace.DeleteFile(askHumanPath); err != nil {
+				return Outcome{Difference: difference, Errors: []error{err}}
+			}
+			return Outcome{Difference: difference, ScriptPath: askHumanPath, ScriptState: "deleted"}
+		}
+	}
+	if c.ManageScript && c.Auto && !scriptExists {
+		return c.ensureScript(difference, scriptContent)
+	}
+
 	return Outcome{Difference: difference}
+}
+
+func (c Coordinator) ensureScript(difference []diff.Entry, content string) Outcome {
+	exists := c.Workspace.Exists(askHumanPath)
+	if exists.IsFailed() {
+		return Outcome{Difference: difference, Errors: []error{exists.Reason()}}
+	}
+	if exists.Value() {
+		return Outcome{Difference: difference}
+	}
+
+	directory := c.Workspace.Exists(scriptsPath)
+	if directory.IsFailed() {
+		return Outcome{Difference: difference, Errors: []error{directory.Reason()}}
+	}
+	if !directory.Value() {
+		root := c.Workspace.Exists(replworksPath)
+		if root.IsFailed() {
+			return Outcome{Difference: difference, Errors: []error{root.Reason()}}
+		}
+		if !root.Value() {
+			if err := c.Workspace.CreateDirectory(replworksPath); err != nil {
+				return Outcome{Difference: difference, Errors: []error{err}}
+			}
+		}
+		if err := c.Workspace.CreateDirectory(scriptsPath); err != nil {
+			return Outcome{Difference: difference, Errors: []error{err}}
+		}
+	}
+	if err := c.Workspace.CreateFile(askHumanPath, content); err != nil {
+		return Outcome{Difference: difference, Errors: []error{err}}
+	}
+
+	return Outcome{Difference: difference, ScriptPath: askHumanPath, ScriptState: "created"}
 }
 
 func canonicalReason(canonical fact.Fact[string]) error {

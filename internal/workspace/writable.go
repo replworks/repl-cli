@@ -65,3 +65,18 @@ func (w Writable) ReplaceFile(rel, content string) error {
 
 	return nil
 }
+
+// DeleteFile removes rel. It is the caller's responsibility to check for its
+// presence before calling DeleteFile.
+func (w Writable) DeleteFile(rel string) error {
+	abs, err := w.resolve(rel)
+	if err != nil {
+		return err
+	}
+
+	if err := os.Remove(abs); err != nil {
+		return fmt.Errorf("deleting %s: %w", rel, err)
+	}
+
+	return nil
+}

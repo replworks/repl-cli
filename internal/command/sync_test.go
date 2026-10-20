@@ -91,8 +91,11 @@ func TestSyncUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
 		t.Fatalf("AGENTS.md = %q, want %q", content, want)
 	}
 	requests := transport.requested()
-	if len(requests) != 1 || requests[0] != string(canon.AgentsAutoDocument) {
-		t.Fatalf("requests = %q, want one request to %q", requests, canon.AgentsAutoDocument)
+	if len(requests) != 2 || requests[0] != string(canon.AgentsAutoDocument) || requests[1] != string(canon.AskHumanScript) {
+		t.Fatalf("requests = %q, want AGENTS AUTO followed by %q", requests, canon.AskHumanScript)
+	}
+	if content, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh")); err != nil || string(content) != want {
+		t.Fatalf("ask-human.sh = %q, err = %v, want %q", content, err, want)
 	}
 }
 
@@ -490,5 +493,35 @@ func TestRenderSync(t *testing.T) {
 				t.Fatalf("stdout = %q, want %q", stdout, tt.wantStdout)
 			}
 		})
+	}
+}
+
+func TestSyncAutomaticSelectionDoesNotFetchOrChangeTheScriptWhenUpToDate(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".replworks/scripts"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	want := "script\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(want), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh"), []byte("keep\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, transport := servePage(t, "script\n")
+	code, stdout, stderr := runCommandWithInput(t, client, "2\n", "sync")
+
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "up to date") {
+		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
+	}
+	requests := transport.requested()
+	if len(requests) != 1 || requests[0] != string(canon.AgentsAutoDocument) {
+		t.Fatalf("requests = %q, want only %q", requests, canon.AgentsAutoDocument)
+	}
+	content, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh"))
+	if err != nil || string(content) != "keep\n" {
+		t.Fatalf("ask-human.sh = %q, err = %v, want unchanged", content, err)
 	}
 }

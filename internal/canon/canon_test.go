@@ -110,6 +110,21 @@ func TestCanonicalCanSelectTheAutomaticDocument(t *testing.T) {
 	}
 }
 
+func TestCanonicalCanRetrieveTheAskHumanScript(t *testing.T) {
+	want := "#!/usr/bin/env bash\necho ask-human\n"
+	client, transport := serveText(t, want)
+
+	got := NewForURL(client, string(AskHumanScript)).Canonical()
+
+	if !got.IsPresent() || got.Value() != want {
+		t.Fatalf("Canonical() = %v, want %q", got, want)
+	}
+	requests := transport.requested()
+	if len(requests) != 1 || requests[0] != string(AskHumanScript) {
+		t.Fatalf("requests = %q, want one request to %q", requests, AskHumanScript)
+	}
+}
+
 func TestCanonicalRequestsOnlyTheSelectedSource(t *testing.T) {
 	client, transport := serveText(t, recordedText(t))
 

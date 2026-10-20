@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/replworks/repl-cli/internal/canon"
 	"github.com/replworks/repl-cli/internal/diff"
 	"github.com/replworks/repl-cli/internal/syncproject"
 	"github.com/replworks/repl-cli/internal/workspace"
@@ -30,15 +31,26 @@ func (r *runner) newSyncCommand() *cobra.Command {
 			}
 
 			outcome := syncproject.Coordinator{
-				Source:     r.canonical(document),
-				Workspace:  workspace.GrantWrite(workspace.New(dir)),
-				Difference: diff.Calculator{},
+				Source:       r.canonical(document),
+				Script:       syncScriptSource(r, document),
+				Auto:         document == canon.AgentsAutoDocument,
+				ManageScript: true,
+				Workspace:    workspace.GrantWrite(workspace.New(dir)),
+				Difference:   diff.Calculator{},
 			}.Run()
 			r.status = renderSync(cmd, outcome)
 
 			return nil
 		},
 	}
+}
+
+func syncScriptSource(r *runner, document canon.Document) syncproject.CanonicalSource {
+	if document == canon.AgentsAutoDocument {
+		return r.askHumanScript()
+	}
+
+	return nil
 }
 
 func renderSync(cmd *cobra.Command, outcome syncproject.Outcome) int {
@@ -69,6 +81,9 @@ func renderSyncOutput(cmd *cobra.Command, outcome syncproject.Outcome, color boo
 			}
 		}
 		_, _ = fmt.Fprintf(out, "%s%s %s%s\n", colorCode, marker, entry.Line, resetCode)
+	}
+	if outcome.ScriptPath != "" {
+		_, _ = fmt.Fprintf(out, "%s: %s\n", outcome.ScriptState, outcome.ScriptPath)
 	}
 
 	if len(outcome.Errors) > 0 {

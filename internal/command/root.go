@@ -39,6 +39,7 @@ type runner struct {
 	app             App
 	status          int
 	canonicalSource *canon.Provider
+	scriptSource    *canon.Provider
 }
 
 func (r *runner) canonical(documents ...canon.Document) *canon.Provider {
@@ -51,6 +52,14 @@ func (r *runner) canonical(documents ...canon.Document) *canon.Provider {
 	}
 
 	return r.canonicalSource
+}
+
+func (r *runner) askHumanScript() *canon.Provider {
+	if r.scriptSource == nil {
+		r.scriptSource = canon.NewForURL(r.app.HTTPClient, string(canon.AskHumanScript))
+	}
+
+	return r.scriptSource
 }
 
 func (r *runner) newRootCommand() *cobra.Command {
