@@ -1,5 +1,14 @@
 # Release Notes
 
+## v0.3.0 - 2026-10-20
+
+### What's Changed
+
+* feat(init): manage ask-human script by agent mode by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/35
+* ci: make CI workflow reusable and add cross-compile checks by [@cable8mm](https://github.com/cable8mm) in https://github.com/replworks/repl-cli/pull/36
+
+**Full Changelog**: https://github.com/replworks/repl-cli/compare/v0.2.2...v0.3.0
+
 ## v0.2.2 - 2026-10-19
 
 ### What's Changed
