@@ -9,7 +9,7 @@ and replaces a project's AGENTS.md with the canonical AGENTS.md.
 ## Install
 
 ```sh
-brew install replworks/tap/repl
+brew install replworks/tap/repl-cli
 ```
 
 Or download a prebuilt archive from
