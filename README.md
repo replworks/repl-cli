@@ -14,7 +14,7 @@ brew install replworks/tap/repl-cli
 
 Or download a prebuilt archive from
 [GitHub Releases](https://github.com/replworks/repl-cli/releases) for darwin,
-linux, and windows (amd64, arm64). Linux users can also install the `.deb`
+and linux (amd64, arm64). Linux users can also install the `.deb`
 package from the [replworks APT repository](https://apt.repl.net).
 
 ## Usage

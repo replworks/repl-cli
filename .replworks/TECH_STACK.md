@@ -79,12 +79,12 @@
 - GitHub Actions MUST install the newest patch release of the major.minor version read from go.mod.
 - GitHub Actions MUST run `govulncheck ./...`.
 - Releases MUST be created from git tags `vMAJOR.MINOR.PATCH`.
-- GoReleaser MUST build binaries for darwin, linux, and windows, each on amd64 and arm64.
+- GoReleaser MUST build binaries for darwin and linux, each on amd64 and arm64.
 - GoReleaser MUST publish archives and a checksum file to GitHub Releases.
 - GoReleaser MUST generate `.deb` packages for linux.
 - GoReleaser MUST generate the Homebrew cask.
 - Distribution channels:
-  - GitHub Releases: all targets.
+  - GitHub Releases: darwin and linux binaries.
   - APT repository `apt.repl.net` (GitHub Pages of `replworks/apt`): linux `.deb` packages.
   - Homebrew tap `replworks/homebrew-tap`: cask.
 - Installation MUST NOT require source compilation.
