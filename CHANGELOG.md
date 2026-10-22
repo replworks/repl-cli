@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.3.2 - 2026-10-22
+
+### What's Changed
+
+* fix(release): remove Windows artifacts by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/39
+
+**Full Changelog**: https://github.com/replworks/repl-cli/compare/v0.3.1...v0.3.2
+
 ## v0.3.1 - 2026-10-22
 
 ### What's Changed
