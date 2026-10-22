@@ -66,6 +66,26 @@ func TestCreateFileFailsWhenTheFileExists(t *testing.T) {
 	}
 }
 
+func TestMakeExecutablePreservesExistingPermissions(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ask-human.sh")
+	if err := os.WriteFile(path, []byte("script\n"), 0o640); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	if err := GrantWrite(New(dir)).MakeExecutable("ask-human.sh"); err != nil {
+		t.Fatalf("MakeExecutable() error = %v, want nil", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if got, want := info.Mode().Perm(), os.FileMode(0o751); got != want {
+		t.Fatalf("permissions = %o, want %o", got, want)
+	}
+}
+
 func TestCreateDirectory(t *testing.T) {
 	dir := t.TempDir()
 

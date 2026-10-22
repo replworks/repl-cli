@@ -49,6 +49,11 @@ func (f *fakeWorkspace) CreateFile(rel, content string) error {
 	return nil
 }
 
+func (f *fakeWorkspace) MakeExecutable(rel string) error {
+	f.events = append(f.events, "make-executable "+rel)
+	return nil
+}
+
 func (f *fakeWorkspace) DeleteFile(rel string) error {
 	f.events = append(f.events, "delete-file "+rel)
 	return nil

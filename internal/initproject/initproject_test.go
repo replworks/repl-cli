@@ -64,6 +64,11 @@ func (f *fakeWriter) CreateFile(rel, content string) error {
 	return nil
 }
 
+func (f *fakeWriter) MakeExecutable(rel string) error {
+	f.events = append(f.events, "make-executable "+rel)
+	return nil
+}
+
 func (f *fakeWriter) CreateDirectory(rel string) error {
 	f.events = append(f.events, "create-directory "+rel)
 	if f.createDirErr != nil {

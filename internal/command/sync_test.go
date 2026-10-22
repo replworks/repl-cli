@@ -97,6 +97,13 @@ func TestSyncUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
 	if content, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh")); err != nil || string(content) != want {
 		t.Fatalf("ask-human.sh = %q, err = %v, want %q", content, err, want)
 	}
+	info, err := os.Stat(filepath.Join(dir, ".replworks/scripts/ask-human.sh"))
+	if err != nil {
+		t.Fatalf("stat ask-human.sh: %v", err)
+	}
+	if info.Mode().Perm()&0o111 == 0 {
+		t.Fatalf("ask-human.sh permissions = %o, want an executable file", info.Mode().Perm())
+	}
 }
 
 func TestSyncRepeatsAfterAnInvalidDocumentSelection(t *testing.T) {
@@ -119,6 +126,34 @@ func TestSyncRepeatsAfterAnInvalidDocumentSelection(t *testing.T) {
 	}
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+}
+
+func TestSyncMakesAnExistingAutomaticScriptExecutableWhenReplacingAgents(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".replworks/scripts"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("# stale\n"), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh"), []byte("script\n"), 0o640); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, "# AGENTS.md\n")
+	code, _, stderr := runCommandWithInput(t, client, "2\n", "sync")
+
+	if code != 0 || stderr != "" {
+		t.Fatalf("code = %d, stderr = %q, want success", code, stderr)
+	}
+	info, err := os.Stat(filepath.Join(dir, ".replworks/scripts/ask-human.sh"))
+	if err != nil {
+		t.Fatalf("stat ask-human.sh: %v", err)
+	}
+	if info.Mode().Perm()&0o111 == 0 {
+		t.Fatalf("ask-human.sh permissions = %o, want an executable file", info.Mode().Perm())
 	}
 }
 

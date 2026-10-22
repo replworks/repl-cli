@@ -86,7 +86,7 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
   - Make no write when required source text is `Failed`.
   - Process items in this order: AGENTS.md, then the `.replworks/` directory, then `.replworks/PRODUCT_SPEC.md`, `.replworks/TECH_STACK.md`, `.replworks/ARCHITECTURE.md`, `.replworks/TASKS.md`, then the helper-script state.
   - Mark an item `skipped` when it is present. Otherwise create it (AGENTS.md with the Canonical Text, the directory, and each document as an empty file).
-  - For standard selection, remove an existing helper script. For automatic-run selection, create the helper-script directory and file only when absent; never replace an existing helper script.
+  - For standard selection, remove an existing helper script. For automatic-run selection, create the helper-script directory and file only when absent; never replace an existing helper script, and ensure the helper script has execute permission.
   - Stop at the first write failure.
 - Inputs: Request with the selected document source, Canonical Text fact, optional Helper Script Text fact, and Workspace presence facts.
 - Outputs: Outcome with one `(item path, created | skipped)` entry per processed item, and execution errors.
@@ -134,7 +134,7 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
   - Only after that, obtain the Canonical Text for the selected sync document. Record an execution error and stop when it is `Failed`.
   - Compare local text and Canonical Text for exact equality.
   - When equal: return `UpToDate` and make no write.
-  - When different: obtain the difference from the Difference Calculator, obtain Helper Script Text only for automatic-run selection, then replace AGENTS.md and adjust helper-script state.
+  - When different: obtain the difference from the Difference Calculator, obtain Helper Script Text only for automatic-run selection, then replace AGENTS.md and adjust helper-script state, including ensuring execute permission on the automatic-run helper script.
   - When replacement fails: keep the computed difference in the Outcome and record an execution error.
 - Inputs: Request with the selected document source, local AGENTS.md fact, Canonical Text fact, optional Helper Script Text fact, and helper-script presence fact.
 - Outputs: Outcome with `UpToDate | Replaced(difference) | ReplaceFailed(difference)`, and execution errors.

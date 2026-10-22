@@ -27,6 +27,7 @@ type Workspace interface {
 	Exists(rel string) fact.Fact[bool]
 	CreateDirectory(rel string) error
 	CreateFile(rel, content string) error
+	MakeExecutable(rel string) error
 	ReplaceFile(rel, content string) error
 	DeleteFile(rel string) error
 }
@@ -108,6 +109,11 @@ func (c Coordinator) Run() Outcome {
 	if c.ManageScript && c.Auto && !scriptExists {
 		return c.ensureScript(difference, scriptContent)
 	}
+	if c.ManageScript && c.Auto {
+		if err := c.Workspace.MakeExecutable(askHumanPath); err != nil {
+			return Outcome{Difference: difference, Errors: []error{err}}
+		}
+	}
 
 	return Outcome{Difference: difference}
 }
@@ -140,6 +146,9 @@ func (c Coordinator) ensureScript(difference []diff.Entry, content string) Outco
 		}
 	}
 	if err := c.Workspace.CreateFile(askHumanPath, content); err != nil {
+		return Outcome{Difference: difference, Errors: []error{err}}
+	}
+	if err := c.Workspace.MakeExecutable(askHumanPath); err != nil {
 		return Outcome{Difference: difference, Errors: []error{err}}
 	}
 

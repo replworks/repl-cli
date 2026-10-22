@@ -37,6 +37,7 @@ type CanonicalSource interface {
 type Writer interface {
 	Exists(rel string) fact.Fact[bool]
 	CreateFile(rel, content string) error
+	MakeExecutable(rel string) error
 	CreateDirectory(rel string) error
 	DeleteFile(rel string) error
 }
@@ -145,10 +146,18 @@ func (c Coordinator) Run() Outcome {
 	}
 
 	if scriptExists {
+		if err := c.Workspace.MakeExecutable(askHumanPath); err != nil {
+			outcome.Errors = append(outcome.Errors, err)
+			return outcome
+		}
 		outcome.Items = append(outcome.Items, Item{Path: askHumanPath})
 		return outcome
 	}
 	if err := c.Workspace.CreateFile(askHumanPath, scriptContent); err != nil {
+		outcome.Errors = append(outcome.Errors, err)
+		return outcome
+	}
+	if err := c.Workspace.MakeExecutable(askHumanPath); err != nil {
 		outcome.Errors = append(outcome.Errors, err)
 		return outcome
 	}
