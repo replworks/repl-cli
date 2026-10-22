@@ -281,8 +281,19 @@
   - External boundary: yes
   - Acceptance criteria:
     - The live script source at `https://www.repl.net/scripts/ask-human.sh` is observed and its response is stored byte-for-byte for automatic-run initialization and synchronization.
-    - Automatic-run init creates `.replworks/scripts/ask-human.sh` when absent and leaves an existing helper script unchanged.
+    - Automatic-run init creates `.replworks/scripts/ask-human.sh` when absent and preserves the content of an existing helper script.
     - Standard init removes an existing helper script and leaves AGENTS.md unchanged when it already exists.
     - Sync adjusts helper-script state only when AGENTS.md differs from the selected document; equal content performs no helper-script network request or file operation.
     - A failed helper-script retrieval prevents writes to the project for init and prevents AGENTS.md replacement for sync.
     - Unit tests cover helper-source retrieval, creation, deletion, skip behavior, and equal-content no-op behavior.
+
+- [X] T-027 Ensure ask-human.sh is executable
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-003, FR-037, FR-041); § Functional Requirements / sync (FR-040, FR-042); ARCHITECTURE.md § Components (C2, C5, C6)
+  - External boundary: no
+  - Acceptance criteria:
+    - Automatic-run init gives a newly created `.replworks/scripts/ask-human.sh` execute permission.
+    - Automatic-run init adds execute permission to an existing helper script without changing its content.
+    - Automatic-run sync gives a newly created helper script execute permission.
+    - Automatic-run sync adds execute permission to an existing helper script when AGENTS.md is replaced without changing its content.
+    - Sync with identical AGENTS.md does not modify the helper script.
+    - Unit and command-level tests pass.

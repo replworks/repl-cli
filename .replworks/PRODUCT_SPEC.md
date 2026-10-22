@@ -122,13 +122,13 @@
 
 - FR-001: repl init MUST present the user with exactly these choices, in this order: `https://www.repl.net/documents/agents.md` and `https://www.repl.net/documents/agents-auto.md`, then create AGENTS.md with the content of the selected document when AGENTS.md does not exist.
 - FR-002: repl init MUST create the .replworks/ directory in the project directory when it does not exist.
-- FR-003: repl init MUST NOT modify an existing file except that selecting the standard AGENTS document MUST remove an existing `.replworks/scripts/ask-human.sh`.
+- FR-003: repl init MUST NOT modify an existing file except that selecting the standard AGENTS document MUST remove an existing `.replworks/scripts/ask-human.sh`, and selecting the automatic-run document MAY add execute permission to that helper script.
 - FR-004: repl init MUST NOT create any file or directory other than AGENTS.md, .replworks/, the four documents defined in FR-036, and `.replworks/scripts/ask-human.sh` plus its parent directory when the automatic-run document is selected.
 - FR-005: repl init MUST print the path of each item it created.
 - FR-006: repl init MUST print the path of each item it skipped because the item already exists.
 - FR-007: repl init MUST exit with code 0 when it completes, including when it skipped items.
 - FR-036: repl init MUST create .replworks/PRODUCT_SPEC.md, .replworks/TECH_STACK.md, .replworks/ARCHITECTURE.md, and .replworks/TASKS.md as empty files when they do not exist.
-- FR-037: When the automatic-run document is selected, repl init MUST create `.replworks/scripts/ask-human.sh` from the exact response text at `https://www.repl.net/scripts/ask-human.sh` when the file does not exist, and MUST leave an existing file unchanged.
+- FR-037: When the automatic-run document is selected, repl init MUST create `.replworks/scripts/ask-human.sh` from the exact response text at `https://www.repl.net/scripts/ask-human.sh` when the file does not exist, and MUST preserve the content of an existing file while ensuring that it has execute permission.
 - FR-038: When the standard AGENTS document is selected, repl init MUST remove `.replworks/scripts/ask-human.sh` when it exists.
 
 ### status
@@ -165,6 +165,8 @@
 - FR-031: repl sync MUST replace the content of AGENTS.md with the selected document's content when the contents differ.
 - FR-039: When repl sync replaces AGENTS.md because its contents differ, selecting the automatic-run document MUST create the helper script from the exact script response when the script does not exist, and selecting the standard document MUST remove the helper script when it exists.
 - FR-040: When AGENTS.md content is identical to the selected document, repl sync MUST NOT create, modify, or remove the helper script.
+- FR-041: When repl init creates or manages `.replworks/scripts/ask-human.sh` for the automatic-run document, the helper script MUST have execute permission.
+- FR-042: When repl sync replaces AGENTS.md for the automatic-run document, the helper script MUST have execute permission whether it is created or already exists.
 - FR-035: repl sync MUST render removed difference lines in red and added difference lines in green when its output is a terminal, and MUST render plain difference lines otherwise.
 
 ### all commands

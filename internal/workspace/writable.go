@@ -38,6 +38,25 @@ func (w Writable) CreateFile(rel, content string) error {
 	return nil
 }
 
+// MakeExecutable adds execute permission bits to rel while preserving its
+// existing read and write permission bits.
+func (w Writable) MakeExecutable(rel string) error {
+	abs, err := w.resolve(rel)
+	if err != nil {
+		return err
+	}
+
+	info, err := os.Stat(abs)
+	if err != nil {
+		return fmt.Errorf("checking %s: %w", rel, err)
+	}
+	if err := os.Chmod(abs, info.Mode().Perm()|0o111); err != nil {
+		return fmt.Errorf("making %s executable: %w", rel, err)
+	}
+
+	return nil
+}
+
 // CreateDirectory creates the directory rel.
 func (w Writable) CreateDirectory(rel string) error {
 	abs, err := w.resolve(rel)
