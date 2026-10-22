@@ -1,5 +1,14 @@
 # Release Notes
 
+## v0.3.1 - 2026-10-22
+
+### What's Changed
+
+* docs: correct Homebrew installation path by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/37
+* fix(init): make helper script executable by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/38
+
+**Full Changelog**: https://github.com/replworks/repl-cli/compare/v0.3.0...v0.3.1
+
 ## v0.3.0 - 2026-10-20
 
 ### What's Changed
