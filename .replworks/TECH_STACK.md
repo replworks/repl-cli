@@ -68,13 +68,13 @@
 
 - Build command: `go build ./cmd/repl`.
 - Builds MUST use `CGO_ENABLED=0`.
-- Binary name MUST be `repl` (`repl.exe` on Windows).
+- Binary name MUST be `repl`.
 - Verification commands, all MUST pass:
   - `gofmt -l .` (MUST print nothing)
   - `go vet ./...`
   - `golangci-lint run`
   - `go test ./...`
-- GitHub Actions MUST run the verification commands on ubuntu, macOS, and Windows.
+- GitHub Actions MUST run the verification commands on ubuntu and macOS.
 - GitHub Actions MUST read the Go version from go.mod.
 - GitHub Actions MUST install the newest patch release of the major.minor version read from go.mod.
 - GitHub Actions MUST run `govulncheck ./...`.
