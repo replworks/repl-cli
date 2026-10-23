@@ -83,14 +83,15 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
 - Responsibilities:
   - Obtain the Canonical Text and Helper Script Text before any write.
   - Make no write when required source text is `Failed`.
-  - Process items in this order: AGENTS.md, then the `.replworks/` directory, then `.replworks/PRODUCT_SPEC.md`, `.replworks/TECH_STACK.md`, `.replworks/ARCHITECTURE.md`, `.replworks/TASKS.md`, then the helper-script state.
-  - Mark an item `skipped` when it is present. Otherwise create it (AGENTS.md with the Canonical Text, the directory, and each document as an empty file).
+  - Process items in this order: AGENTS.md, then the `.replworks/` directory, the four authoritative documents, `.replworks/docs/`, `.replworks/docs/IDEAS.md`, `.replworks/docs/PITCHING_SCRIPT.md`, then the helper-script state.
+  - Mark an item `skipped` when it is present. Otherwise create it (AGENTS.md with the Canonical Text, directories, and each document as an empty file).
   - Create the helper-script directory when absent, replace the helper script with Helper Script Text whether absent or present, and ensure it has execute permission.
+  - Never modify or delete the human-edited documents after creation; their paths are managed only through create-if-absent operations.
   - Stop at the first write failure.
 - Inputs: Request with the canonical document source, Canonical Text fact, Helper Script Text fact, and Workspace presence facts.
 - Outputs: Outcome with one `(item path, created | skipped | replaced)` entry per processed item, and execution errors.
 - Ownership boundaries:
-  - Owns the item order and the created/skipped decision.
+  - Owns the item order and the created/skipped/replaced decision.
   - Does not perform I/O itself, print, or compare content.
   - Holds the Workspace `Write` capability.
 

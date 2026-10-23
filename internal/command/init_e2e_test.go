@@ -64,6 +64,18 @@ func TestInitAgainstTheLiveCanonicalAndScriptSources(t *testing.T) {
 	if string(content) != want {
 		t.Fatal("AGENTS.md does not hold the live canonical AGENTS.md")
 	}
+	for _, path := range []string{".replworks/docs/IDEAS.md", ".replworks/docs/PITCHING_SCRIPT.md"} {
+		content, err := os.ReadFile(filepath.Join(dir, path))
+		if err != nil {
+			t.Fatalf("reading %s: %v", path, err)
+		}
+		if len(content) != 0 {
+			t.Fatalf("%s = %q, want an empty file", path, content)
+		}
+		if !strings.Contains(stdout, "created: "+path) {
+			t.Fatalf("stdout = %q, want creation output for %s", stdout, path)
+		}
+	}
 	script, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh"))
 	if err != nil {
 		t.Fatalf("reading ask-human.sh: %v", err)
@@ -239,6 +251,14 @@ func TestInitAgainstTheLiveSourceSkipsEveryExistingItem(t *testing.T) {
 	}
 	for _, document := range []string{"PRODUCT_SPEC.md", "TECH_STACK.md", "ARCHITECTURE.md", "TASKS.md"} {
 		if err := os.WriteFile(filepath.Join(dir, ".replworks", document), []byte(document+"\n"), 0o644); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(dir, ".replworks/docs"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	for _, document := range []string{"IDEAS.md", "PITCHING_SCRIPT.md"} {
+		if err := os.WriteFile(filepath.Join(dir, ".replworks/docs", document), []byte("human content: "+document+"\n"), 0o644); err != nil {
 			t.Fatalf("setup: %v", err)
 		}
 	}

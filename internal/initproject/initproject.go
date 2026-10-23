@@ -14,6 +14,9 @@ const (
 	techStackPath    = ".replworks/TECH_STACK.md"
 	architecturePath = ".replworks/ARCHITECTURE.md"
 	tasksPath        = ".replworks/TASKS.md"
+	docsPath         = ".replworks/docs"
+	ideasPath        = ".replworks/docs/IDEAS.md"
+	pitchingPath     = ".replworks/docs/PITCHING_SCRIPT.md"
 	scriptsPath      = ".replworks/scripts"
 	askHumanPath     = ".replworks/scripts/ask-human.sh"
 )
@@ -26,6 +29,9 @@ var itemPaths = []string{
 	techStackPath,
 	architecturePath,
 	tasksPath,
+	docsPath,
+	ideasPath,
+	pitchingPath,
 }
 
 // CanonicalSource provides the canonical AGENTS.md.
@@ -97,7 +103,7 @@ func (c Coordinator) Run() Outcome {
 
 		var err error
 		switch path {
-		case replworksPath:
+		case replworksPath, docsPath:
 			err = c.Workspace.CreateDirectory(path)
 		case agentsPath:
 			err = c.Workspace.CreateFile(path, canonical.Value())

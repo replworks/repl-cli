@@ -13,7 +13,7 @@ func (r *runner) newInitCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
 		Short: "Create AGENTS.md and the REPL Works documents",
-		Long:  "init writes the canonical AGENTS.md and ask-human.sh into the project directory, creates the .replworks directory, and creates the four authoritative documents under it as empty files.",
+		Long:  "init writes the canonical AGENTS.md and ask-human.sh into the project directory, creates the four authoritative documents under .replworks as empty files, and creates IDEAS.md and PITCHING_SCRIPT.md under .replworks/docs as empty human-edited files.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, err := r.projectDir()
