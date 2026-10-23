@@ -1,5 +1,14 @@
 # Release Notes
 
+## v0.4.0 - 2026-10-23
+
+### What's Changed
+
+* feat(init): install helper script on init and sync by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/41
+* feat(init): create human-edited docs files by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/42
+
+**Full Changelog**: https://github.com/replworks/repl-cli/compare/v0.3.3...v0.4.0
+
 ## v0.3.3 - 2026-10-22
 
 ### What's Changed
