@@ -1,14 +1,10 @@
 package command
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/replworks/repl-cli/internal/canon"
 	"github.com/replworks/repl-cli/internal/initproject"
 	"github.com/replworks/repl-cli/internal/workspace"
 )
@@ -17,22 +13,17 @@ func (r *runner) newInitCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
 		Short: "Create AGENTS.md and the REPL Works documents",
-		Long:  "init writes the canonical AGENTS.md into the project directory, creates the .replworks directory, and creates the four authoritative documents under it as empty files. Existing entries are left unchanged.",
+		Long:  "init writes the canonical AGENTS.md and ask-human.sh into the project directory, creates the .replworks directory, and creates the four authoritative documents under it as empty files.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			document, err := selectDocument(cmd)
-			if err != nil {
-				return err
-			}
-
 			dir, err := r.projectDir()
 			if err != nil {
 				return err
 			}
 
 			outcome := initproject.Coordinator{
-				Source:       r.canonical(document),
-				Script:       initScriptSource(r, document),
+				Source:       r.canonical(),
+				Script:       r.askHumanScript(),
 				ManageScript: true,
 				Workspace:    workspace.GrantWrite(workspace.New(dir)),
 			}.Run()
@@ -43,42 +34,6 @@ func (r *runner) newInitCommand() *cobra.Command {
 	}
 }
 
-func initScriptSource(r *runner, document canon.Document) initproject.CanonicalSource {
-	if document == canon.AgentsAutoDocument {
-		return r.askHumanScript()
-	}
-
-	return nil
-}
-
-func selectDocument(cmd *cobra.Command) (canon.Document, error) {
-	out := cmd.OutOrStdout()
-	scanner := bufio.NewScanner(cmd.InOrStdin())
-	for {
-		_, _ = fmt.Fprintln(out, "Select an AGENTS.md document:")
-		_, _ = fmt.Fprintf(out, "1) %s\n", canon.AgentsDocument)
-		_, _ = fmt.Fprintf(out, "2) %s\n", canon.AgentsAutoDocument)
-		_, _ = fmt.Fprintln(out, "Choice [1-2]:")
-
-		if !scanner.Scan() {
-			if err := scanner.Err(); err != nil {
-				return "", fmt.Errorf("reading the init document selection: %w", err)
-			}
-
-			return "", errors.New("an init document selection is required")
-		}
-
-		switch strings.TrimSpace(scanner.Text()) {
-		case "1":
-			return canon.AgentsDocument, nil
-		case "2":
-			return canon.AgentsAutoDocument, nil
-		default:
-			_, _ = fmt.Fprintln(out, "Invalid selection. Please enter 1 or 2.")
-		}
-	}
-}
-
 func renderInit(cmd *cobra.Command, outcome initproject.Outcome) int {
 	out := cmd.OutOrStdout()
 
@@ -86,6 +41,8 @@ func renderInit(cmd *cobra.Command, outcome initproject.Outcome) int {
 		state := "skipped"
 		if item.Created {
 			state = "created"
+		} else if item.Replaced {
+			state = "replaced"
 		} else if item.Deleted {
 			state = "deleted"
 		}

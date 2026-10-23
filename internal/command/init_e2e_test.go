@@ -42,14 +42,14 @@ func liveDocument(t *testing.T, document canon.Document) string {
 	return canonical.Value()
 }
 
-func TestInitAgainstTheLiveAutomaticSource(t *testing.T) {
-	want := liveDocument(t, canon.AgentsAutoDocument)
+func TestInitAgainstTheLiveCanonicalAndScriptSources(t *testing.T) {
+	want := liveCanonical(t)
 	wantScript := liveAskHumanScript(t)
 
 	dir := t.TempDir()
 	t.Chdir(dir)
 
-	code, stdout, stderr := runCommandWithInput(t, nil, "2\n", "init")
+	code, stdout, stderr := runCommandWithInput(t, nil, "", "init")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
@@ -62,7 +62,7 @@ func TestInitAgainstTheLiveAutomaticSource(t *testing.T) {
 		t.Fatalf("reading AGENTS.md: %v", err)
 	}
 	if string(content) != want {
-		t.Fatal("AGENTS.md does not hold the selected live AGENTS.md")
+		t.Fatal("AGENTS.md does not hold the live canonical AGENTS.md")
 	}
 	script, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh"))
 	if err != nil {
@@ -257,8 +257,8 @@ func TestInitAgainstTheLiveSourceSkipsEveryExistingItem(t *testing.T) {
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
-	if after := directoryState(t, dir); after != before {
-		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	if after := directoryState(t, dir); strings.ReplaceAll(after, "\n.replworks/scripts/\n.replworks/scripts/ask-human.sh="+liveAskHumanScript(t), "") != before {
+		t.Fatalf("project directory changed beyond installing the helper script:\nbefore: %s\nafter:  %s", before, after)
 	}
 
 	for _, want := range []string{
