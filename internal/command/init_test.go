@@ -287,8 +287,8 @@ func TestInitCreatesAgentsAndReplworks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading .replworks: %v", err)
 	}
-	if len(inside) != 5 {
-		t.Fatalf(".replworks holds %d entries, want 5 including scripts", len(inside))
+	if len(inside) != 6 {
+		t.Fatalf(".replworks holds %d entries, want 6 including docs and scripts", len(inside))
 	}
 
 	if got := transport.requested(); len(got) != 2 {
@@ -623,5 +623,41 @@ func TestInitReplacesExistingAskHumanScriptRegardlessOfInput(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "replaced: .replworks/scripts/ask-human.sh") {
 		t.Fatalf("stdout = %q, want replacement output", stdout)
+	}
+}
+
+func TestInitAndSyncPreserveHumanEditedDocuments(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".replworks/docs"), 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(recordedText(t)), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	wantIdeas := "ideas maintained by a person\n"
+	wantPitch := "pitch script maintained by a person\n"
+	if err := os.WriteFile(filepath.Join(dir, ".replworks/docs/IDEAS.md"), []byte(wantIdeas), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".replworks/docs/PITCHING_SCRIPT.md"), []byte(wantPitch), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+	client, _ := servePage(t, recordedText(t))
+
+	for _, command := range []string{"init", "sync"} {
+		code, _, stderr := runCommand(t, client, command)
+		if code != 0 || stderr != "" {
+			t.Fatalf("%s: code = %d, stderr = %q, want success", command, code, stderr)
+		}
+	}
+	for path, want := range map[string]string{
+		".replworks/docs/IDEAS.md":           wantIdeas,
+		".replworks/docs/PITCHING_SCRIPT.md": wantPitch,
+	} {
+		content, err := os.ReadFile(filepath.Join(dir, path))
+		if err != nil || string(content) != want {
+			t.Fatalf("%s = %q, err = %v, want preserved content %q", path, content, err, want)
+		}
 	}
 }

@@ -297,3 +297,12 @@
     - Automatic-run sync adds execute permission to an existing helper script when AGENTS.md is replaced without changing its content.
     - Sync with identical AGENTS.md does not modify the helper script.
     - Unit and command-level tests pass.
+
+- [X] T-028 Create human-edited docs files with init
+  - Satisfies: PRODUCT_SPEC.md § Functional Requirements / init (FR-043, FR-044); § Acceptance Criteria (AC-045, AC-046); ARCHITECTURE.md § Components (C2)
+  - External boundary: yes
+  - Acceptance criteria:
+    - An E2E test exercises init through the live canonical sources and verifies `.replworks/docs/IDEAS.md` and `.replworks/docs/PITCHING_SCRIPT.md` are created empty.
+    - Init creates `.replworks/docs/` when absent and reports all created paths.
+    - Existing files with user content are skipped and remain byte for byte unchanged through init and sync.
+    - Unit tests for the Init Coordinator's create-if-absent behavior pass.

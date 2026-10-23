@@ -55,6 +55,7 @@
 - Exit code of each command.
 - AGENTS.md file and .replworks/ directory created by repl init.
 - `.replworks/scripts/ask-human.sh` created or replaced by init and sync.
+- `.replworks/docs/IDEAS.md` and `.replworks/docs/PITCHING_SCRIPT.md` created empty by init when absent.
 - AGENTS.md file replaced by repl sync.
 
 ## Constraints
@@ -78,7 +79,7 @@
 ### Commands
 
 - EL-001: repl init
-  - Purpose: create AGENTS.md, the .replworks/ directory, and the four authoritative documents under .replworks/ in the project directory.
+  - Purpose: create AGENTS.md, the .replworks/ directory, the four authoritative documents, and the two human-edited documents under .replworks/ in the project directory.
   - Input: none.
   - Output: one line per created, skipped, or replaced item, each containing the item path.
   - Exit: 0 on completion, 2 on execution error.
@@ -118,13 +119,15 @@
 - FR-001: repl init MUST create AGENTS.md with the content of `https://www.repl.net/documents/agents.md` when AGENTS.md does not exist, without prompting for a selection.
 - FR-002: repl init MUST create the .replworks/ directory in the project directory when it does not exist.
 - FR-003: repl init MUST NOT modify an existing file except that it MUST replace `.replworks/scripts/ask-human.sh` with the exact published response and ensure that it has execute permission.
-- FR-004: repl init MUST NOT create any file or directory other than AGENTS.md, .replworks/, the four documents defined in FR-036, and `.replworks/scripts/ask-human.sh` plus its parent directory.
+- FR-004: repl init MUST NOT create any file or directory other than AGENTS.md, .replworks/, the four documents defined in FR-036, `.replworks/scripts/ask-human.sh` plus its parent directory, and the files and directory defined in FR-043.
 - FR-005: repl init MUST print the path of each item it created.
 - FR-006: repl init MUST print the path of each item it skipped because the item already exists.
 - FR-007: repl init MUST exit with code 0 when it completes, including when it skipped items.
 - FR-036: repl init MUST create .replworks/PRODUCT_SPEC.md, .replworks/TECH_STACK.md, .replworks/ARCHITECTURE.md, and .replworks/TASKS.md as empty files when they do not exist.
 - FR-037: repl init MUST create `.replworks/scripts/ask-human.sh` from the exact response text at `https://www.repl.net/scripts/ask-human.sh` when the file does not exist, and MUST replace the content of an existing file with that response while ensuring that it has execute permission.
 - FR-038: repl init MUST NOT prompt for a canonical document selection.
+- FR-043: repl init MUST create `.replworks/docs/` when it does not exist and create empty `.replworks/docs/IDEAS.md` and `.replworks/docs/PITCHING_SCRIPT.md` files when they do not exist. Existing entries MUST be skipped and left unchanged.
+- FR-044: After either human-edited document exists, no repl-cli command MUST modify or delete it.
 
 ### status
 
@@ -261,3 +264,5 @@
 - AC-038: Given an AGENTS.md that differs from the canonical document, when repl sync writes to a terminal, then removed difference lines contain the red terminal color sequence and added difference lines contain the green terminal color sequence. When output is not a terminal, the difference contains no color sequences. (FR-035, EL-005)
 - AC-039: Given an empty directory, when repl init runs without input, then .replworks/PRODUCT_SPEC.md, .replworks/TECH_STACK.md, .replworks/ARCHITECTURE.md, and .replworks/TASKS.md exist with zero bytes, and each is reported as created. (FR-005, FR-036, EL-001)
 - AC-040: Given a .replworks/ directory that contains some but not all of the four documents, when repl init runs, then each missing document is created empty, each existing document is unchanged and reported as skipped, and the exit code is 0. (FR-003, FR-006, FR-036, EL-001)
+- AC-045: Given a project without `.replworks/docs/`, `repl init` creates the directory and empty `IDEAS.md` and `PITCHING_SCRIPT.md` files, and reports each created path.
+- AC-046: Given either human-edited file already exists with content, `repl init` reports it as skipped and preserves its content byte for byte. `repl sync` also leaves both files unchanged.

@@ -119,6 +119,9 @@ func TestRunCreatesEveryEntry(t *testing.T) {
 		{Path: ".replworks/TECH_STACK.md", Created: true},
 		{Path: ".replworks/ARCHITECTURE.md", Created: true},
 		{Path: ".replworks/TASKS.md", Created: true},
+		{Path: ".replworks/docs", Created: true},
+		{Path: ".replworks/docs/IDEAS.md", Created: true},
+		{Path: ".replworks/docs/PITCHING_SCRIPT.md", Created: true},
 	}
 	if len(outcome.Items) != len(want) {
 		t.Fatalf("items = %+v, want %+v", outcome.Items, want)
@@ -136,6 +139,8 @@ func TestRunCreatesEveryEntry(t *testing.T) {
 		".replworks/TECH_STACK.md",
 		".replworks/ARCHITECTURE.md",
 		".replworks/TASKS.md",
+		".replworks/docs/IDEAS.md",
+		".replworks/docs/PITCHING_SCRIPT.md",
 	} {
 		content, ok := writer.files[path]
 		if !ok {
@@ -148,6 +153,9 @@ func TestRunCreatesEveryEntry(t *testing.T) {
 	if !writer.dirs[".replworks"] {
 		t.Fatal(".replworks was not created")
 	}
+	if !writer.dirs[".replworks/docs"] {
+		t.Fatal(".replworks/docs was not created")
+	}
 	if source.calls != 1 {
 		t.Fatalf("canonical source called %d times, want 1", source.calls)
 	}
@@ -155,7 +163,10 @@ func TestRunCreatesEveryEntry(t *testing.T) {
 		"exists .replworks/PRODUCT_SPEC.md, create-file .replworks/PRODUCT_SPEC.md, " +
 		"exists .replworks/TECH_STACK.md, create-file .replworks/TECH_STACK.md, " +
 		"exists .replworks/ARCHITECTURE.md, create-file .replworks/ARCHITECTURE.md, " +
-		"exists .replworks/TASKS.md, create-file .replworks/TASKS.md"
+		"exists .replworks/TASKS.md, create-file .replworks/TASKS.md, " +
+		"exists .replworks/docs, create-directory .replworks/docs, " +
+		"exists .replworks/docs/IDEAS.md, create-file .replworks/docs/IDEAS.md, " +
+		"exists .replworks/docs/PITCHING_SCRIPT.md, create-file .replworks/docs/PITCHING_SCRIPT.md"
 	if got := writer.trace(); got != wantTrace {
 		t.Fatalf("trace = %q, want %q", got, wantTrace)
 	}
@@ -184,6 +195,26 @@ func TestRunSkipsExistingEntries(t *testing.T) {
 	wantTrace := "exists " + strings.Join(itemPaths, ", exists ")
 	if writer.trace() != wantTrace {
 		t.Fatalf("trace = %q, want only presence checks", writer.trace())
+	}
+}
+
+func TestRunPreservesExistingHumanEditedDocuments(t *testing.T) {
+	writer := newFakeWriter(itemPaths...)
+	writer.files[ideasPath] = "keep ideas\n"
+	writer.files[pitchingPath] = "keep pitch\n"
+
+	outcome := Coordinator{Source: newSource(), Workspace: writer}.Run()
+
+	if len(outcome.Errors) > 0 {
+		t.Fatalf("errors = %v, want none", outcome.Errors)
+	}
+	if writer.files[ideasPath] != "keep ideas\n" || writer.files[pitchingPath] != "keep pitch\n" {
+		t.Fatalf("human-edited documents changed: %q, %q", writer.files[ideasPath], writer.files[pitchingPath])
+	}
+	for _, item := range outcome.Items {
+		if (item.Path == ideasPath || item.Path == pitchingPath) && (item.Created || item.Replaced || item.Deleted) {
+			t.Fatalf("item = %+v, want existing file skipped", item)
+		}
 	}
 }
 
@@ -216,6 +247,9 @@ func TestRunCreatesOnlyTheMissingDocuments(t *testing.T) {
 		".replworks/PRODUCT_SPEC.md",
 		".replworks/ARCHITECTURE.md",
 		".replworks/TASKS.md",
+		".replworks/docs",
+		".replworks/docs/IDEAS.md",
+		".replworks/docs/PITCHING_SCRIPT.md",
 	)
 
 	outcome := Coordinator{Source: newSource(), Workspace: writer}.Run()
