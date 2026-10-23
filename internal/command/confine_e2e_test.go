@@ -99,8 +99,8 @@ func TestInitInASubdirectoryCreatesFilesInTheProjectDirectoryOnly(t *testing.T) 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
 	}
-	if got := transport.requested(); len(got) != 1 {
-		t.Fatalf("requests = %q, want the canonical text retrieved exactly once", got)
+	if got := transport.requested(); len(got) != 2 {
+		t.Fatalf("requests = %q, want canonical text and helper script", got)
 	}
 	for _, rel := range []string{"AGENTS.md", ".replworks"} {
 		if _, err := os.Stat(filepath.Join(project, rel)); err != nil {

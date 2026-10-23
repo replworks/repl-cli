@@ -8,12 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/replworks/repl-cli/internal/canon"
 )
 
-func TestSyncAgainstTheLiveAutomaticSource(t *testing.T) {
-	want := liveDocument(t, canon.AgentsAutoDocument)
+func TestSyncAgainstTheLiveCanonicalAndScriptSources(t *testing.T) {
+	want := liveCanonical(t)
 	wantScript := liveAskHumanScript(t)
 
 	dir := t.TempDir()
@@ -22,7 +20,7 @@ func TestSyncAgainstTheLiveAutomaticSource(t *testing.T) {
 	}
 	t.Chdir(dir)
 
-	code, stdout, stderr := runCommandWithInput(t, nil, "2\n", "sync")
+	code, stdout, stderr := runCommandWithInput(t, nil, "", "sync")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
@@ -35,7 +33,7 @@ func TestSyncAgainstTheLiveAutomaticSource(t *testing.T) {
 		t.Fatalf("reading AGENTS.md: %v", err)
 	}
 	if string(content) != want {
-		t.Fatal("AGENTS.md does not hold the selected live document")
+		t.Fatal("AGENTS.md does not hold the live canonical document")
 	}
 	script, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh"))
 	if err != nil {
@@ -55,8 +53,6 @@ func TestSyncAgainstTheLiveSourceReportsUpToDate(t *testing.T) {
 	}
 	t.Chdir(dir)
 
-	before := directoryState(t, dir)
-
 	code, stdout, stderr := runCommand(t, nil, "sync")
 
 	if code != 0 {
@@ -68,8 +64,8 @@ func TestSyncAgainstTheLiveSourceReportsUpToDate(t *testing.T) {
 	if !strings.Contains(stdout, "up to date") {
 		t.Fatalf("stdout = %q, want an up-to-date indication", stdout)
 	}
-	if after := directoryState(t, dir); after != before {
-		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	if content, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh")); err != nil || string(content) != liveAskHumanScript(t) {
+		t.Fatalf("ask-human.sh = %q, err = %v, want the live script", content, err)
 	}
 }
 

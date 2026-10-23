@@ -176,7 +176,6 @@ func TestRunDoesNotReplaceAGENTSWhenTheAutomaticScriptCannotBeObtained(t *testin
 	failure := errors.New("the helper script is unreachable")
 	coord, _, workspace := coordinator(fact.Present("old\n"), fact.Present("new\n"))
 	coord.ManageScript = true
-	coord.Auto = true
 	coord.Script = &fakeSource{canonical: fact.Failed[string](failure)}
 
 	outcome := coord.Run()

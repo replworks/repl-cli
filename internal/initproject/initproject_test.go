@@ -87,6 +87,14 @@ func (f *fakeWriter) DeleteFile(rel string) error {
 	return nil
 }
 
+func (f *fakeWriter) ReplaceFile(rel, content string) error {
+	f.events = append(f.events, "replace-file "+rel)
+	f.files[rel] = content
+	f.present[rel] = true
+
+	return nil
+}
+
 func (f *fakeWriter) trace() string {
 	return strings.Join(f.events, ", ")
 }
@@ -288,8 +296,8 @@ func TestRunDoesNotWriteWhenTheAutomaticScriptCannotBeObtained(t *testing.T) {
 	if len(outcome.Errors) != 1 || !errors.Is(outcome.Errors[0], failure) {
 		t.Fatalf("errors = %v, want the helper-script failure", outcome.Errors)
 	}
-	if len(writer.events) != 1 || writer.events[0] != "exists .replworks/scripts/ask-human.sh" {
-		t.Fatalf("events = %q, want only the helper-script presence check", writer.events)
+	if len(writer.events) != 0 {
+		t.Fatalf("events = %q, want no workspace access before both sources are obtained", writer.events)
 	}
 }
 

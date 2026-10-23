@@ -51,7 +51,6 @@ type Outcome struct {
 type Coordinator struct {
 	Source       CanonicalSource
 	Script       CanonicalSource
-	Auto         bool
 	ManageScript bool
 	Workspace    Workspace
 	Difference   DifferenceCalculator
@@ -72,87 +71,78 @@ func (c Coordinator) Run() Outcome {
 		return Outcome{Errors: []error{canonicalReason(canonical)}}
 	}
 
-	if local.Value() == canonical.Value() {
-		return Outcome{UpToDate: true}
+	upToDate := local.Value() == canonical.Value()
+	var difference []diff.Entry
+	if !upToDate {
+		difference = c.Difference.Compare(local.Value(), canonical.Value())
 	}
 
-	difference := c.Difference.Compare(local.Value(), canonical.Value())
-
-	scriptExists := false
 	scriptContent := ""
 	if c.ManageScript {
-		exists := c.Workspace.Exists(askHumanPath)
-		if exists.IsFailed() {
-			return Outcome{Difference: difference, Errors: []error{exists.Reason()}}
+		if c.Script == nil {
+			return Outcome{UpToDate: upToDate, Difference: difference, Errors: []error{errors.New("the ask-human.sh source is unavailable")}}
 		}
-		scriptExists = exists.Value()
-	}
-	if c.ManageScript && c.Auto && c.Script != nil && !scriptExists {
 		script := c.Script.Canonical()
 		if !script.IsPresent() {
-			return Outcome{Difference: difference, Errors: []error{canonicalReason(script)}}
+			return Outcome{UpToDate: upToDate, Difference: difference, Errors: []error{canonicalReason(script)}}
 		}
 		scriptContent = script.Value()
 	}
-	if err := c.Workspace.ReplaceFile(agentsPath, canonical.Value()); err != nil {
-		return Outcome{Difference: difference, Errors: []error{err}}
-	}
-
-	if c.ManageScript && !c.Auto {
-		if scriptExists {
-			if err := c.Workspace.DeleteFile(askHumanPath); err != nil {
-				return Outcome{Difference: difference, Errors: []error{err}}
-			}
-			return Outcome{Difference: difference, ScriptPath: askHumanPath, ScriptState: "deleted"}
-		}
-	}
-	if c.ManageScript && c.Auto && !scriptExists {
-		return c.ensureScript(difference, scriptContent)
-	}
-	if c.ManageScript && c.Auto {
-		if err := c.Workspace.MakeExecutable(askHumanPath); err != nil {
+	if !upToDate {
+		if err := c.Workspace.ReplaceFile(agentsPath, canonical.Value()); err != nil {
 			return Outcome{Difference: difference, Errors: []error{err}}
 		}
 	}
 
-	return Outcome{Difference: difference}
+	if c.ManageScript {
+		return c.writeScript(upToDate, difference, scriptContent)
+	}
+
+	return Outcome{UpToDate: upToDate, Difference: difference}
 }
 
-func (c Coordinator) ensureScript(difference []diff.Entry, content string) Outcome {
+func (c Coordinator) writeScript(upToDate bool, difference []diff.Entry, content string) Outcome {
 	exists := c.Workspace.Exists(askHumanPath)
 	if exists.IsFailed() {
-		return Outcome{Difference: difference, Errors: []error{exists.Reason()}}
-	}
-	if exists.Value() {
-		return Outcome{Difference: difference}
+		return Outcome{UpToDate: upToDate, Difference: difference, Errors: []error{exists.Reason()}}
 	}
 
-	directory := c.Workspace.Exists(scriptsPath)
-	if directory.IsFailed() {
-		return Outcome{Difference: difference, Errors: []error{directory.Reason()}}
-	}
-	if !directory.Value() {
-		root := c.Workspace.Exists(replworksPath)
-		if root.IsFailed() {
-			return Outcome{Difference: difference, Errors: []error{root.Reason()}}
+	if !exists.Value() {
+		directory := c.Workspace.Exists(scriptsPath)
+		if directory.IsFailed() {
+			return Outcome{UpToDate: upToDate, Difference: difference, Errors: []error{directory.Reason()}}
 		}
-		if !root.Value() {
-			if err := c.Workspace.CreateDirectory(replworksPath); err != nil {
-				return Outcome{Difference: difference, Errors: []error{err}}
+		if !directory.Value() {
+			root := c.Workspace.Exists(replworksPath)
+			if root.IsFailed() {
+				return Outcome{UpToDate: upToDate, Difference: difference, Errors: []error{root.Reason()}}
+			}
+			if !root.Value() {
+				if err := c.Workspace.CreateDirectory(replworksPath); err != nil {
+					return Outcome{UpToDate: upToDate, Difference: difference, Errors: []error{err}}
+				}
+			}
+			if err := c.Workspace.CreateDirectory(scriptsPath); err != nil {
+				return Outcome{UpToDate: upToDate, Difference: difference, Errors: []error{err}}
 			}
 		}
-		if err := c.Workspace.CreateDirectory(scriptsPath); err != nil {
-			return Outcome{Difference: difference, Errors: []error{err}}
+	}
+	state := "replaced"
+	if exists.Value() {
+		if err := c.Workspace.ReplaceFile(askHumanPath, content); err != nil {
+			return Outcome{UpToDate: upToDate, Difference: difference, Errors: []error{err}}
+		}
+	} else {
+		state = "created"
+		if err := c.Workspace.CreateFile(askHumanPath, content); err != nil {
+			return Outcome{UpToDate: upToDate, Difference: difference, Errors: []error{err}}
 		}
 	}
-	if err := c.Workspace.CreateFile(askHumanPath, content); err != nil {
-		return Outcome{Difference: difference, Errors: []error{err}}
-	}
 	if err := c.Workspace.MakeExecutable(askHumanPath); err != nil {
-		return Outcome{Difference: difference, Errors: []error{err}}
+		return Outcome{UpToDate: upToDate, Difference: difference, Errors: []error{err}}
 	}
 
-	return Outcome{Difference: difference, ScriptPath: askHumanPath, ScriptState: "created"}
+	return Outcome{UpToDate: upToDate, Difference: difference, ScriptPath: askHumanPath, ScriptState: state}
 }
 
 func canonicalReason(canonical fact.Fact[string]) error {

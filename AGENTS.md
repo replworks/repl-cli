@@ -191,28 +191,45 @@ For every task:
 5. If the task touches a domain that is not covered by verified knowledge in PRODUCT_SPEC.md, TECH_STACK.md, or ARCHITECTURE.md: stop. Mark the relevant section UNVERIFIED (see UNVERIFIED_MARK). Do not implement against an UNVERIFIED section. Require explicit human confirmation before continuing.
 6. Implement
 7. Write unit tests for internal logic
-8. If the task touches an EXTERNAL_BOUNDARY: write an E2E test against the live boundary. A mocked test alone does not satisfy this step. If the live boundary is unreachable, stop and report. Do not mark the task `[X]`.
+8. If the task touches an EXTERNAL_BOUNDARY: write an E2E test against the live boundary. A mocked test alone does not satisfy this step. If the live boundary is unreachable, stop and report. Do not mark the task `[x]`.
 9. Run all tests
-10. Mark the completed task `[X]` in TASKS.md
+10. Mark the completed task `[x]` in TASKS.md
 11. Deliver and continue (see AUTO_RUN)
 
 ---
 
 ## AUTO_RUN
 
+AUTO_RUN applies only to tasks from TASKS.md.
+Any other change the human requests in the session is committed only after human review.
+
 Repeat TASK_SELECTION and TASK_EXECUTION until no unchecked task remains.
 Do not stop between tasks. Do not ask for approval to start a task.
 
-Accounts, commit author, and co-author are given by the human in the bootstrap prompt.
-If they are missing, stop and ask.
+Before the first git operation of a session, ask the human to confirm
+the delivery identities. Fill in every value and ask in this form:
+
+Commit author/committer: <name> <noreply email>
+Co-authored-by: <human account> (only when the human took part in the change)
+PR creator / assignee: <bot account>
+Merger: <account>
+Is this correct?
+
+Fill missing values using available context, including `gh` commands. Show the
+complete values and ask: "<values>. Is this correct?" Wait for the human's
+confirmation before any git operation.
 
 Per task:
 
 1. Pull main.
 2. Create branch `t-NNN-slug`.
 3. Implement and test (TASK_EXECUTION).
-4. Commit as the human account.
-5. Open a PR as the bot account. Reviewer: human account. Assignee: bot account.
+4. Commit with the agent that wrote the code as author and committer
+   (name and noreply email of that agent).
+   Add a `Co-authored-by` trailer for the human account
+   when the human specified the change or answered a question about it,
+   in the session or on GitHub. Add no other `Co-authored-by` trailer.
+5. Open a PR as the bot account. Assignee: bot account.
 6. Squash merge only after every CI check on the PR has passed.
    Pending is not passed. If no CI is configured, there is no gate.
 7. Pull main and start the next task.
@@ -227,6 +244,7 @@ Stop and ask the human only when:
 an UNVERIFIED gap needs a decision
 documents conflict
 a task is invalidated, or a spec/task/stack/architecture change is needed
+a human-requested change is awaiting review
 a live EXTERNAL_BOUNDARY is unreachable
 a task requires a Developer decision
 a manual or permission step is required
@@ -344,7 +362,7 @@ When the human explicitly asks for such a change in the session:
    If the change would, stop (see PRODUCT_SPEC_CHANGES).
 3. Do not record the change in TASKS.md or any other document.
 4. Run the verification commands defined in TECH_STACK.md.
-5. Deliver it like a task (branch, PR, merge; see AUTO_RUN).
+5. Show the diff and test results. After explicit human approval, commit, open the PR, and merge by AUTO_RUN steps 4-6 (merge only after CI passes).
 6. Stop.
 
 Never make such changes on your own initiative.

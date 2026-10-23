@@ -15,12 +15,12 @@ func TestCommandsRequestOnlyTheCanonicalSource(t *testing.T) {
 		name         string
 		agents       string
 		documents    bool
-		wantRequests int
+		wantRequests []string
 	}{
-		{name: "init", wantRequests: 1},
-		{name: "status", documents: true, wantRequests: 0},
-		{name: "check", documents: true, wantRequests: 1},
-		{name: "sync", agents: "# stale\n", documents: true, wantRequests: 1},
+		{name: "init", wantRequests: []string{canon.SourceURL, string(canon.AskHumanScript)}},
+		{name: "status", documents: true},
+		{name: "check", documents: true, wantRequests: []string{canon.SourceURL}},
+		{name: "sync", agents: "# stale\n", documents: true, wantRequests: []string{canon.SourceURL, string(canon.AskHumanScript)}},
 	}
 
 	for _, tt := range tests {
@@ -47,12 +47,12 @@ func TestCommandsRequestOnlyTheCanonicalSource(t *testing.T) {
 			}
 
 			requests := transport.requested()
-			if len(requests) != tt.wantRequests {
-				t.Fatalf("requests = %q, want %d", requests, tt.wantRequests)
+			if len(requests) != len(tt.wantRequests) {
+				t.Fatalf("requests = %q, want %q", requests, tt.wantRequests)
 			}
-			for _, request := range requests {
-				if request != canon.SourceURL {
-					t.Fatalf("requested %q, want %q", request, canon.SourceURL)
+			for i, request := range requests {
+				if request != tt.wantRequests[i] {
+					t.Fatalf("requests = %q, want %q", requests, tt.wantRequests)
 				}
 			}
 		})

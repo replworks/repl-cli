@@ -40,13 +40,15 @@ type Writer interface {
 	MakeExecutable(rel string) error
 	CreateDirectory(rel string) error
 	DeleteFile(rel string) error
+	ReplaceFile(rel, content string) error
 }
 
 // Item reports one managed entry.
 type Item struct {
-	Path    string
-	Created bool
-	Deleted bool
+	Path     string
+	Created  bool
+	Deleted  bool
+	Replaced bool
 }
 
 type Outcome struct {
@@ -67,16 +69,11 @@ func (c Coordinator) Run() Outcome {
 		return Outcome{Errors: []error{canonicalReason(canonical)}}
 	}
 
-	scriptExists := false
 	scriptContent := ""
 	if c.ManageScript {
-		exists := c.Workspace.Exists(askHumanPath)
-		if exists.IsFailed() {
-			return Outcome{Errors: []error{exists.Reason()}}
+		if c.Script == nil {
+			return Outcome{Errors: []error{errors.New("the ask-human.sh source is unavailable")}}
 		}
-		scriptExists = exists.Value()
-	}
-	if c.ManageScript && c.Script != nil && !scriptExists {
 		script := c.Script.Canonical()
 		if !script.IsPresent() {
 			return Outcome{Errors: []error{canonicalReason(script)}}
@@ -115,17 +112,6 @@ func (c Coordinator) Run() Outcome {
 		outcome.Items = append(outcome.Items, Item{Path: path, Created: true})
 	}
 
-	if c.ManageScript && c.Script == nil {
-		if scriptExists {
-			if err := c.Workspace.DeleteFile(askHumanPath); err != nil {
-				outcome.Errors = append(outcome.Errors, err)
-				return outcome
-			}
-			outcome.Items = append(outcome.Items, Item{Path: askHumanPath, Deleted: true})
-		}
-		return outcome
-	}
-
 	if !c.ManageScript {
 		return outcome
 	}
@@ -145,12 +131,21 @@ func (c Coordinator) Run() Outcome {
 		outcome.Items = append(outcome.Items, Item{Path: scriptsPath, Created: true})
 	}
 
-	if scriptExists {
+	scriptExists := c.Workspace.Exists(askHumanPath)
+	if scriptExists.IsFailed() {
+		outcome.Errors = append(outcome.Errors, scriptExists.Reason())
+		return outcome
+	}
+	if scriptExists.Value() {
+		if err := c.Workspace.ReplaceFile(askHumanPath, scriptContent); err != nil {
+			outcome.Errors = append(outcome.Errors, err)
+			return outcome
+		}
 		if err := c.Workspace.MakeExecutable(askHumanPath); err != nil {
 			outcome.Errors = append(outcome.Errors, err)
 			return outcome
 		}
-		outcome.Items = append(outcome.Items, Item{Path: askHumanPath})
+		outcome.Items = append(outcome.Items, Item{Path: askHumanPath, Replaced: true})
 		return outcome
 	}
 	if err := c.Workspace.CreateFile(askHumanPath, scriptContent); err != nil {

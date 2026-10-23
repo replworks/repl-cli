@@ -65,7 +65,7 @@ func TestRenderSyncLeavesDifferenceLinesPlainForNonTerminalOutput(t *testing.T) 
 	}
 }
 
-func TestSyncUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
+func TestSyncUsesTheCanonicalDocumentAndInstallsTheScriptWithoutSelection(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("# stale\n"), 0o644); err != nil {
 		t.Fatalf("setup: %v", err)
@@ -75,7 +75,7 @@ func TestSyncUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
 	want := "# AGENTS.md\n\n## AUTO_RUN\n"
 	client, transport := servePage(t, want)
 
-	code, stdout, stderr := runCommandWithInput(t, client, "2\n", "sync")
+	code, stdout, stderr := runCommandWithInput(t, client, "ignored input\n", "sync")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
@@ -91,8 +91,8 @@ func TestSyncUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
 		t.Fatalf("AGENTS.md = %q, want %q", content, want)
 	}
 	requests := transport.requested()
-	if len(requests) != 2 || requests[0] != string(canon.AgentsAutoDocument) || requests[1] != string(canon.AskHumanScript) {
-		t.Fatalf("requests = %q, want AGENTS AUTO followed by %q", requests, canon.AskHumanScript)
+	if len(requests) != 2 || requests[0] != string(canon.AgentsDocument) || requests[1] != string(canon.AskHumanScript) {
+		t.Fatalf("requests = %q, want canonical document followed by %q", requests, canon.AskHumanScript)
 	}
 	if content, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh")); err != nil || string(content) != want {
 		t.Fatalf("ask-human.sh = %q, err = %v, want %q", content, err, want)
@@ -106,7 +106,7 @@ func TestSyncUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
 	}
 }
 
-func TestSyncRepeatsAfterAnInvalidDocumentSelection(t *testing.T) {
+func TestSyncDoesNotReadInputForDocumentSelection(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("# stale\n"), 0o644); err != nil {
 		t.Fatalf("setup: %v", err)
@@ -121,8 +121,8 @@ func TestSyncRepeatsAfterAnInvalidDocumentSelection(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
 	}
-	if !strings.Contains(stdout, "Invalid selection. Please enter 1 or 2.") {
-		t.Fatalf("stdout = %q, want the invalid-selection message", stdout)
+	if strings.Contains(stdout, "Select an AGENTS.md document") || strings.Contains(stdout, "Invalid selection") {
+		t.Fatalf("stdout = %q, want no selection prompt", stdout)
 	}
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
@@ -157,33 +157,22 @@ func TestSyncMakesAnExistingAutomaticScriptExecutableWhenReplacingAgents(t *test
 	}
 }
 
-func TestSyncFailsWithoutASelectionBeforeNetworkOrWrite(t *testing.T) {
+func TestSyncWithoutAGENTSDoesNotReadInputOrRequestNetwork(t *testing.T) {
 	dir := t.TempDir()
-	local := "# stale\n"
-	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(local), 0o644); err != nil {
-		t.Fatalf("setup: %v", err)
-	}
 	t.Chdir(dir)
 
 	client, transport := servePage(t, "# remote\n")
 
-	code, _, stderr := runCommandWithInput(t, client, "", "sync")
+	code, stdout, _ := runCommandWithInput(t, client, "", "sync")
 
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2", code)
 	}
-	if !strings.Contains(stderr, "selection is required") {
-		t.Fatalf("stderr = %q, want the missing-selection error", stderr)
+	if !strings.Contains(stdout, "AGENTS.md does not exist") {
+		t.Fatalf("stdout = %q, want the missing-file error", stdout)
 	}
 	if got := transport.requested(); len(got) != 0 {
 		t.Fatalf("requests = %q, want none", got)
-	}
-	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
-	if err != nil {
-		t.Fatalf("reading AGENTS.md: %v", err)
-	}
-	if string(content) != local {
-		t.Fatalf("AGENTS.md = %q, want unchanged %q", content, local)
 	}
 }
 
@@ -195,8 +184,6 @@ func TestSyncReportsUpToDate(t *testing.T) {
 	t.Chdir(dir)
 
 	client, transport := servePage(t, string(recordedPage(t)))
-	before := directoryState(t, dir)
-
 	code, stdout, stderr := runCommand(t, client, "sync")
 
 	if code != 0 {
@@ -208,11 +195,11 @@ func TestSyncReportsUpToDate(t *testing.T) {
 	if !strings.Contains(stdout, "up to date") {
 		t.Fatalf("stdout = %q, want an up-to-date indication", stdout)
 	}
-	if after := directoryState(t, dir); after != before {
-		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	if content, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh")); err != nil || string(content) != recordedText(t) {
+		t.Fatalf("ask-human.sh = %q, err = %v, want the canonical live script source", content, err)
 	}
-	if got := transport.requested(); len(got) != 1 {
-		t.Fatalf("requests = %q, want 1", got)
+	if got := transport.requested(); len(got) != 2 {
+		t.Fatalf("requests = %q, want canonical document and helper script", got)
 	}
 }
 
@@ -531,7 +518,7 @@ func TestRenderSync(t *testing.T) {
 	}
 }
 
-func TestSyncAutomaticSelectionDoesNotFetchOrChangeTheScriptWhenUpToDate(t *testing.T) {
+func TestSyncReplacesTheScriptEvenWhenAgentsIsUpToDate(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".replworks/scripts"), 0o755); err != nil {
 		t.Fatalf("setup: %v", err)
@@ -546,17 +533,17 @@ func TestSyncAutomaticSelectionDoesNotFetchOrChangeTheScriptWhenUpToDate(t *test
 	t.Chdir(dir)
 
 	client, transport := servePage(t, "script\n")
-	code, stdout, stderr := runCommandWithInput(t, client, "2\n", "sync")
+	code, stdout, stderr := runCommandWithInput(t, client, "", "sync")
 
 	if code != 0 || stderr != "" || !strings.Contains(stdout, "up to date") {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
 	}
 	requests := transport.requested()
-	if len(requests) != 1 || requests[0] != string(canon.AgentsAutoDocument) {
-		t.Fatalf("requests = %q, want only %q", requests, canon.AgentsAutoDocument)
+	if len(requests) != 2 || requests[0] != string(canon.AgentsDocument) || requests[1] != string(canon.AskHumanScript) {
+		t.Fatalf("requests = %q, want canonical document and helper script", requests)
 	}
 	content, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh"))
-	if err != nil || string(content) != "keep\n" {
-		t.Fatalf("ask-human.sh = %q, err = %v, want unchanged", content, err)
+	if err != nil || string(content) != "script\n" {
+		t.Fatalf("ask-human.sh = %q, err = %v, want published contents", content, err)
 	}
 }

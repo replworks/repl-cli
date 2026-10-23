@@ -132,14 +132,14 @@ func runCommandWithInput(t *testing.T, client *http.Client, input string, args .
 	return app.Execute(args), stdout.String(), stderr.String()
 }
 
-func TestInitUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
+func TestInitUsesTheCanonicalDocumentAndInstallsTheScriptWithoutSelection(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 
 	want := "# AGENTS.md\n\n## AUTO_RUN\n"
 	client, transport := servePage(t, want)
 
-	code, stdout, stderr := runCommandWithInput(t, client, "2\n", "init")
+	code, stdout, stderr := runCommandWithInput(t, client, "ignored input\n", "init")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
@@ -155,8 +155,8 @@ func TestInitUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
 		t.Fatalf("AGENTS.md = %q, want %q", content, want)
 	}
 	requests := transport.requested()
-	if len(requests) != 2 || requests[0] != string(canon.AgentsAutoDocument) || requests[1] != string(canon.AskHumanScript) {
-		t.Fatalf("requests = %q, want AGENTS AUTO followed by %q", requests, canon.AskHumanScript)
+	if len(requests) != 2 || requests[0] != string(canon.AgentsDocument) || requests[1] != string(canon.AskHumanScript) {
+		t.Fatalf("requests = %q, want canonical document followed by %q", requests, canon.AskHumanScript)
 	}
 	if content, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh")); err != nil || string(content) != want {
 		t.Fatalf("ask-human.sh = %q, err = %v, want %q", content, err, want)
@@ -170,7 +170,7 @@ func TestInitUsesTheAutomaticDocumentWhenSelected(t *testing.T) {
 	}
 }
 
-func TestInitRepeatsAfterAnInvalidDocumentSelection(t *testing.T) {
+func TestInitDoesNotReadInputForDocumentSelection(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 
@@ -182,14 +182,14 @@ func TestInitRepeatsAfterAnInvalidDocumentSelection(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
 	}
-	if !strings.Contains(stdout, "Invalid selection. Please enter 1 or 2.") {
-		t.Fatalf("stdout = %q, want the invalid-selection message", stdout)
+	if strings.Contains(stdout, "Select an AGENTS.md document") || strings.Contains(stdout, "Invalid selection") {
+		t.Fatalf("stdout = %q, want no selection prompt", stdout)
 	}
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
-	if got := transport.requested(); len(got) != 2 || got[0] != string(canon.AgentsAutoDocument) || got[1] != string(canon.AskHumanScript) {
-		t.Fatalf("requests = %q, want AGENTS AUTO followed by %q", got, canon.AskHumanScript)
+	if got := transport.requested(); len(got) != 2 || got[0] != string(canon.AgentsDocument) || got[1] != string(canon.AskHumanScript) {
+		t.Fatalf("requests = %q, want canonical document followed by %q", got, canon.AskHumanScript)
 	}
 	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
 	if err != nil {
@@ -200,7 +200,7 @@ func TestInitRepeatsAfterAnInvalidDocumentSelection(t *testing.T) {
 	}
 }
 
-func TestInitMakesAnExistingAutomaticScriptExecutable(t *testing.T) {
+func TestInitReplacesAnExistingScriptAndMakesItExecutable(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".replworks/scripts"), 0o755); err != nil {
 		t.Fatalf("setup: %v", err)
@@ -210,8 +210,8 @@ func TestInitMakesAnExistingAutomaticScriptExecutable(t *testing.T) {
 	}
 	t.Chdir(dir)
 
-	client, _ := servePage(t, "# AGENTS.md\n")
-	code, _, stderr := runCommandWithInput(t, client, "2\n", "init")
+	client, _ := servePage(t, "published script\n")
+	code, _, stderr := runCommandWithInput(t, client, "", "init")
 
 	if code != 0 || stderr != "" {
 		t.Fatalf("code = %d, stderr = %q, want success", code, stderr)
@@ -223,28 +223,24 @@ func TestInitMakesAnExistingAutomaticScriptExecutable(t *testing.T) {
 	if info.Mode().Perm()&0o111 == 0 {
 		t.Fatalf("ask-human.sh permissions = %o, want an executable file", info.Mode().Perm())
 	}
+	content, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh"))
+	if err != nil || string(content) != "published script\n" {
+		t.Fatalf("ask-human.sh = %q, err = %v, want published content", content, err)
+	}
 }
 
-func TestInitRejectsMissingDocumentSelectionWithoutNetworkOrWrites(t *testing.T) {
+func TestInitDoesNotRequireInput(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 
 	client, transport := servePage(t, "# AGENTS.md\n")
-	before := directoryState(t, dir)
-
 	code, _, stderr := runCommandWithInput(t, client, "", "init")
 
-	if code != 2 {
-		t.Fatalf("exit code = %d, want 2", code)
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit code = %d, stderr = %q, want success without input", code, stderr)
 	}
-	if stderr == "" || !strings.Contains(stderr, "selection is required") {
-		t.Fatalf("stderr = %q, want the missing-selection error", stderr)
-	}
-	if got := transport.requested(); len(got) != 0 {
-		t.Fatalf("requests = %q, want none", got)
-	}
-	if after := directoryState(t, dir); after != before {
-		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	if got := transport.requested(); len(got) != 2 {
+		t.Fatalf("requests = %q, want canonical document and script", got)
 	}
 }
 
@@ -291,12 +287,12 @@ func TestInitCreatesAgentsAndReplworks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading .replworks: %v", err)
 	}
-	if len(inside) != 4 {
-		t.Fatalf(".replworks holds %d entries, want 4", len(inside))
+	if len(inside) != 5 {
+		t.Fatalf(".replworks holds %d entries, want 5 including scripts", len(inside))
 	}
 
-	if got := transport.requested(); len(got) != 1 {
-		t.Fatalf("requests = %q, want 1", got)
+	if got := transport.requested(); len(got) != 2 {
+		t.Fatalf("requests = %q, want canonical document and script", got)
 	}
 
 	documents := []string{
@@ -347,15 +343,10 @@ func TestInitLeavesExistingEntriesUnchanged(t *testing.T) {
 	t.Chdir(dir)
 
 	client, _ := servePage(t, string(recordedPage(t)))
-	before := directoryState(t, dir)
-
 	code, stdout, stderr := runCommand(t, client, "init")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
-	}
-	if after := directoryState(t, dir); after != before {
-		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
 	}
 
 	for _, want := range []string{
@@ -365,6 +356,7 @@ func TestInitLeavesExistingEntriesUnchanged(t *testing.T) {
 		"skipped: .replworks/TECH_STACK.md",
 		"skipped: .replworks/ARCHITECTURE.md",
 		"skipped: .replworks/TASKS.md",
+		"created: .replworks/scripts/ask-human.sh",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout = %q, want it to contain %q", stdout, want)
@@ -431,7 +423,6 @@ func TestInitFailsWhenTheCanonicalSourceIsUnavailable(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	client := &http.Client{Transport: &recordingTransport{target: server.URL}}
-
 	before := directoryState(t, dir)
 
 	code, stdout, stderr := runCommand(t, client, "init")
@@ -493,7 +484,6 @@ func TestInitSkipsEntriesOfAnyKind(t *testing.T) {
 	t.Chdir(dir)
 
 	client, _ := servePage(t, string(recordedPage(t)))
-	before := directoryState(t, dir)
 
 	code, stdout, stderr := runCommand(t, client, "init")
 
@@ -503,8 +493,8 @@ func TestInitSkipsEntriesOfAnyKind(t *testing.T) {
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
-	if after := directoryState(t, dir); after != before {
-		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	if _, err := os.Stat(filepath.Join(dir, ".replworks/scripts/ask-human.sh")); err != nil {
+		t.Fatalf("ask-human.sh was not installed: %v", err)
 	}
 
 	for _, want := range []string{
@@ -606,7 +596,7 @@ func TestInitRejectsArguments(t *testing.T) {
 	}
 }
 
-func TestInitStandardSelectionRemovesTheAskHumanScript(t *testing.T) {
+func TestInitReplacesExistingAskHumanScriptRegardlessOfInput(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".replworks/scripts"), 0o755); err != nil {
 		t.Fatalf("setup: %v", err)
@@ -625,13 +615,13 @@ func TestInitStandardSelectionRemovesTheAskHumanScript(t *testing.T) {
 	if code != 0 || stderr != "" {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".replworks/scripts/ask-human.sh")); !os.IsNotExist(err) {
-		t.Fatalf("ask-human.sh stat error = %v, want deleted", err)
+	if content, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh")); err != nil || string(content) != "# AGENTS.md\n" {
+		t.Fatalf("ask-human.sh = %q, err = %v, want replacement from the published source", content, err)
 	}
 	if content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md")); err != nil || string(content) != "keep\n" {
 		t.Fatalf("AGENTS.md = %q, err = %v, want unchanged", content, err)
 	}
-	if !strings.Contains(stdout, "deleted: .replworks/scripts/ask-human.sh") {
-		t.Fatalf("stdout = %q, want deletion output", stdout)
+	if !strings.Contains(stdout, "replaced: .replworks/scripts/ask-human.sh") {
+		t.Fatalf("stdout = %q, want replacement output", stdout)
 	}
 }
