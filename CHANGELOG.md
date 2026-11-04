@@ -1,5 +1,15 @@
 # Release Notes
 
+## v0.5.0 - 2026-11-04
+
+### What's Changed
+
+* chore: add ask-human script and update agent orchestration rules by [@cable8mm](https://github.com/cable8mm) in https://github.com/replworks/repl-cli/pull/43
+* feat(sync): keep framework blocks in AGENTS.md by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/44
+* ci: run macOS verification for maintainer changes by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/45
+
+**Full Changelog**: https://github.com/replworks/repl-cli/compare/v0.4.0...v0.5.0
+
 ## v0.4.0 - 2026-10-23
 
 ### What's Changed
