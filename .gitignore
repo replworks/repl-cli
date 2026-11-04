@@ -52,3 +52,4 @@ config.toml
 .env
 *.local
 .repl/runtime/*
+package-lock.json
