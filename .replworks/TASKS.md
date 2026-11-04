@@ -306,3 +306,15 @@
     - Init creates `.replworks/docs/` when absent and reports all created paths.
     - Existing files with user content are skipped and remain byte for byte unchanged through init and sync.
     - Unit tests for the Init Coordinator's create-if-absent behavior pass.
+
+- [x] T-029 Preserve framework blocks in AGENTS.md through sync and check
+  - Satisfies: PRODUCT_SPEC.md § Inputs (Fenced code block, Block opening line, Block closing line, Preserved block, Expected AGENTS.md); § Functional Requirements / check (FR-017); § Functional Requirements / sync (FR-028 through FR-031, FR-045); § Error Conditions (ERR-008); § Acceptance Criteria (AC-012, AC-020, AC-021, AC-047 through AC-051); ARCHITECTURE.md § Components (C5, C12, C14)
+  - External boundary: yes
+  - Acceptance criteria:
+    - Sync keeps a `<name>` … `</name>` block and a `<!-- BEGIN:name -->` … `<!-- END:name -->` block byte for byte after the canonical content, each preceded by one empty line.
+    - Tag lines inside fenced code blocks, indented, or with other text on the same line are not block lines.
+    - Sync of an AGENTS.md that equals the expected AGENTS.md reports up to date and does not modify AGENTS.md.
+    - An opening line without a closing line makes sync print an error line with that line number, modify no file, and exit with code 2.
+    - Check reports no agents-canonical violation for an AGENTS.md equal to the expected AGENTS.md, and reports one with the line number for an unclosed opening line.
+    - An E2E test runs sync against the live canonical source with an AGENTS.md that contains a preserved block and verifies the block is kept.
+    - Unit tests for the Preserved Block Reader, Sync Coordinator, and Rule Evaluator pass.

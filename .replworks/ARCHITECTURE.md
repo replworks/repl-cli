@@ -19,6 +19,7 @@
 - **Helper Script Text**: the exact `ask-human.sh` content obtained from the published source defined in PRODUCT_SPEC.md.
 - **Task Ledger**: the ordered list of task entries parsed from one TASKS.md text.
 - **Task Entry**: a task ID plus a completion state, as recognized by the Task Ledger Reader.
+- **Preserved Block** and **Expected Text**: the preserved block and expected AGENTS.md defined in PRODUCT_SPEC.md.
 - **Mark**: one occurrence of the UNVERIFIED text within a heading line of an authoritative document.
 - **Fact**: a piece of information obtained from outside a pure component. Every fact has exactly one state:
   - `Present(value)`
@@ -51,9 +52,10 @@ Command Interface
  │                       Base Branch Reader, Task Ledger Reader,
  │                       Unverified Mark Scanner, Rule Evaluator
  └─ Sync Coordinator   → Project Workspace (Read+Write), Canonical Document Provider,
-                         Difference Calculator
+                         Preserved Block Reader, Difference Calculator
 
-Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
+Rule Evaluator → Preserved Block Reader
+Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Document Line Classifier
 ```
 
 - Dependencies point only downward in this map.
@@ -132,16 +134,17 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
 - Responsibilities:
   - Read the local AGENTS.md fact first. Record an execution error and stop when it is `Absent` or `Failed`.
   - Only after that, obtain the Canonical Text. Record an execution error and stop when it is `Failed`.
-  - Compare local text and Canonical Text for exact equality.
-  - When equal: mark `UpToDate` and make no AGENTS.md write.
   - Obtain Helper Script Text for every sync after confirming AGENTS.md exists and the canonical AGENTS.md was retrieved.
-  - When different, obtain the difference and replace AGENTS.md. Whether AGENTS.md is equal or different, replace the helper script with Helper Script Text and ensure execute permission.
+  - Ask the Preserved Block Reader for the Expected Text from the local text and Canonical Text. When it reports an unclosed opening line: record an execution error containing that line number and stop before any write.
+  - Compare local text and Expected Text for exact equality.
+  - When equal: mark `UpToDate` and make no AGENTS.md write.
+  - When different, obtain the difference between local text and Expected Text and replace AGENTS.md with the Expected Text. Whether AGENTS.md is equal or different, replace the helper script with Helper Script Text and ensure execute permission.
   - When replacement fails: keep the computed difference in the Outcome and record an execution error.
-- Inputs: Request with the canonical document source, local AGENTS.md fact, Canonical Text fact, Helper Script Text fact, and helper-script presence fact.
+- Inputs: Request with the canonical document source, local AGENTS.md fact, Canonical Text fact, Helper Script Text fact, helper-script presence fact, and the Expected Text result.
 - Outputs: Outcome with AGENTS.md up-to-date/replaced state, optional difference, helper-script created/replaced state, and execution errors.
 - Ownership boundaries:
-  - Owns the order of local check, retrieval, comparison, difference, replacement.
-  - Does not perform I/O itself, compute the difference itself, or print.
+  - Owns the order of local check, retrieval, expected-text composition, comparison, difference, replacement.
+  - Does not perform I/O itself, compute the difference or the Expected Text itself, or print.
   - Holds the Workspace `Write` capability.
 
 ### C6. Project Workspace
@@ -266,7 +269,9 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
     - An `Absent` document contributes zero Marks.
   - **agents-canonical**
     - Precondition: working AGENTS.md `Present` and Canonical Text `Present`.
-    - One violation when the two texts are not exactly equal. Path is AGENTS.md.
+    - Obtain the Expected Text from the Preserved Block Reader.
+    - One violation when the reader reports an unclosed opening line; the message contains that line number. Path is AGENTS.md.
+    - Otherwise one violation when the working AGENTS.md and the Expected Text are not exactly equal. Path is AGENTS.md.
 - Newly complete task definition:
   - An ID is complete in the base ledger when at least one base entry with that ID is complete.
   - A working entry is newly complete when it is complete and its ID is not complete in the base ledger.
@@ -285,6 +290,19 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
   - Owns difference computation only.
   - Does not decide whether texts differ (the Sync Coordinator compares exact equality), does no I/O. Is pure.
 
+### C14. Preserved Block Reader
+
+- Responsibilities:
+  - Recognize block opening lines, block closing lines, and Preserved Blocks in classified AGENTS.md lines, using the definitions in PRODUCT_SPEC.md and the fence rule of the Document Line Classifier.
+  - Do not treat a line as a block opening line when the same line is a block opening line in the Canonical Text.
+  - Compose the Expected Text from the Canonical Text and the Preserved Blocks, keeping each block's original bytes, including line endings.
+  - Report an unclosed opening line with its line number instead of an Expected Text.
+- Inputs: local AGENTS.md text, Canonical Text.
+- Outputs: `Expected Text | unclosed opening line (line number, opening line)`.
+- Ownership boundaries:
+  - Owns the block line grammar and the Expected Text composition.
+  - Does not compare texts, does no I/O, and does not decide how an unclosed opening line is reported. Is pure.
+
 ## 5. Component Responsibilities (summary)
 
 | Responsibility                              | Sole owner                                              |
@@ -298,6 +316,7 @@ Task Ledger Reader and Unverified Mark Scanner → Document Line Classifier
 | Repository access                           | Base Branch Reader                                      |
 | Line numbering and fence recognition        | Document Line Classifier                                |
 | Task Entry grammar and ledger derivations   | Task Ledger Reader                                      |
+| Preserved Block grammar and Expected Text   | Preserved Block Reader                                  |
 | Heading and Mark definitions                | Unverified Mark Scanner                                 |
 | Rule identifiers, order, logic, messages    | Rule Evaluator                                          |
 | Line-level difference                       | Difference Calculator                                   |
@@ -359,9 +378,13 @@ Request → Sync Coordinator
   [Absent | Failed] → Outcome(error), no write
   Canonical Document Provider → Canonical Text fact
   [Failed] → Outcome(error), no write
-  exact comparison
-    equal → Outcome(UpToDate) + Helper Script Text fact
-    different → Difference Calculator → difference + Helper Script Text fact
+  Canonical Document Provider → Helper Script Text fact
+  [Failed] → Outcome(error), no write
+  Preserved Block Reader(local, Canonical Text) → Expected Text
+  [unclosed opening line] → Outcome(error with line number), no write
+  exact comparison of local and Expected Text
+    equal → Outcome(UpToDate)
+    different → Difference Calculator → difference
   [both] → Workspace Write: replace helper script; when different, replace AGENTS.md
   → Outcome(UpToDate | Replaced | ReplaceFailed, difference, script state)
   → Command Interface → lines + status
@@ -392,7 +415,7 @@ Request → Sync Coordinator
 - AR-06: A coordinator that must write obtains every fact it needs before its first write.
 - AR-07: Violations are produced only by the Rule Evaluator. Execution errors are produced only by coordinators from `Failed` facts or failed writes.
 - AR-08: A `Failed` fact disables only the rules that depend on it; independent rules still run.
-- AR-09: All comparisons of document text are exact. No normalization of line endings, whitespace, or case.
+- AR-09: All comparisons of document text are exact. No normalization of line endings, whitespace, or case. AGENTS.md is compared with the Expected Text.
 - AR-10: Output lines are rendered only after a coordinator has returned its Outcome.
 - AR-11: Violation and error ordering is fixed by this document and never depends on completion timing.
 - AR-12: The Rule Evaluator's rule set and order are fixed; adding a rule is an architecture change.
@@ -412,6 +435,8 @@ Request → Sync Coordinator
 | An authoritative document unreadable (check)                  | Project Workspace                           | Check Coordinator  | Execution error. Rules that depend on it are not evaluated                                                              |
 | Write fails (init)                                            | Project Workspace                           | Init Coordinator   | Execution error. Stop. Items already created remain and are reported                                                    |
 | Replacement fails (sync)                                      | Project Workspace                           | Sync Coordinator   | Execution error. The difference is still reported                                                                       |
+| AGENTS.md block opening line without closing line (sync)     | Preserved Block Reader                      | Sync Coordinator   | Execution error with the line number, no write                                                                          |
+| AGENTS.md block opening line without closing line (check)    | Preserved Block Reader                      | Rule Evaluator     | agents-canonical violation with the line number                                                                         |
 | Malformed task or heading lines                               | Task Ledger Reader, Unverified Mark Scanner | Same components    | Ignored. Parsing never fails                                                                                            |
 
 - Execution error: a fact could not be obtained or a write could not be performed.
@@ -421,7 +446,7 @@ Request → Sync Coordinator
 ## 10. Non-Goals
 
 - No rule registry, plug-in mechanism, or user-defined rules.
-- No interpretation of document content beyond: presence, exact text, Task Entries, and heading Marks.
+- No interpretation of document content beyond: presence, exact text, Task Entries, heading Marks, and AGENTS.md Preserved Blocks.
 - No caching of the Canonical Text, and no fallback source for it, across invocations.
 - No rollback or transaction across multiple writes.
 - No automatic repair of rule violations by check.
@@ -450,7 +475,7 @@ Each entry: ambiguity → decision → why.
 - RD-02: The TASKS.md location is only implied by the authoritative document list → the working-tree TASKS.md is the authoritative document `.replworks/TASKS.md`, and the base TASKS.md is the same project-relative path on the base branch → confirmed by the user.
 - RD-03: The grammar of a Task Entry is undefined → exact checkbox list line form defined in C10; `x` and `X` mean complete; anything else is not an entry; lines inside fenced blocks are not entries → confirmed by the user, with the fence exclusion following the same rule used for headings.
 - RD-04: Duplicate task IDs and "absent or incomplete on base" are ambiguous → entries are counted individually, and an ID is complete in base when any base entry with that ID is complete; task-ids-unchanged compares distinct IDs → keeps counts per entry (status totals) while keeping ID identity stable across branches.
-- RD-05: Whether agents-canonical normalizes content is undefined → exact comparison with no normalization, also used by sync → confirmed by the user; matches "identical" in sync.
+- RD-05: Whether agents-canonical normalizes content is undefined → exact comparison with no normalization against the Expected Text, also used by sync → confirmed by the user; matches "identical" in sync.
 - RD-06: The canonical source's representation is not defined by this architecture → the Canonical Document Provider hides the response representation and returns the exact response text; "cannot be obtained" includes an unsuccessful response or unavailable response → source-specific representation handling stays inside the provider.
 - RD-07: When the canonical text is retrieved is undefined → exactly once per invocation from the canonical source, and always attempted by init, sync (after the local check), and check → ERR-001 requires an error line from check in every case where retrieval fails, so retrieval cannot be skipped.
 - RD-08: init may meet an existing AGENTS.md while the canonical text is unobtainable → init obtains the Canonical Text first and writes nothing on failure, even when AGENTS.md already exists → ERR-001 applies unconditionally to init.
@@ -468,3 +493,4 @@ Each entry: ambiguity → decision → why.
 - RD-20: Sync prints the difference and replaces the file, but the order is undefined → the difference is computed before replacement and rendered after the Outcome is returned; if replacement fails, the difference is still shown with the error → the user always sees what would have changed.
 - RD-21: FR-032 (project directory only) and FR-033 (two allowed network addresses) versus the External Systems list → access to the version-control repository and either published document is allowed only through C8 and C7 respectively; every other access goes through C6 and is confined to the Project Directory → keeps all external access in single named owners.
 - RD-22: Usage help and similar interface-level assistance are not listed in PRODUCT_SPEC.md → the Command Interface produces them itself, they touch no other component, and they perform no read, write, or network access → they are not use cases; PRODUCT_SPEC.md still needs a later update to list them, since ERR-005 does not mention them.
+- RD-13: Frameworks insert their own tagged blocks into AGENTS.md → sync keeps Preserved Blocks after the canonical content, check ignores them through the same Expected Text, and an unclosed opening line stops sync without writes → confirmed by the user; one shared definition keeps sync and check consistent, and stopping avoids guessing where a block ends.

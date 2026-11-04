@@ -109,6 +109,31 @@ func TestEvaluateReportsADifferentAgentsMD(t *testing.T) {
 			canon:  fact.Present("# AGENTS.md\n"),
 		},
 		{
+			name:   "canonical text followed by a preserved block",
+			agents: fact.Present("# AGENTS.md\n\n<laravel-boost-guidelines>\nrules\n</laravel-boost-guidelines>\n"),
+			canon:  fact.Present("# AGENTS.md\n"),
+		},
+		{
+			name:   "preserved block with a different canonical part",
+			agents: fact.Present("# old\n\n<rules>\n</rules>\n"),
+			canon:  fact.Present("# AGENTS.md\n"),
+			want: []Violation{{
+				Rule:    RuleAgentsCanonical,
+				Path:    "AGENTS.md",
+				Message: "AGENTS.md differs from the canonical AGENTS.md",
+			}},
+		},
+		{
+			name:   "unclosed block opening line",
+			agents: fact.Present("# AGENTS.md\n\n<rules>\n"),
+			canon:  fact.Present("# AGENTS.md\n"),
+			want: []Violation{{
+				Rule:    RuleAgentsCanonical,
+				Path:    "AGENTS.md",
+				Message: "AGENTS.md line 3 opens <rules> without a matching closing line; add the closing line or remove the block",
+			}},
+		},
+		{
 			name:   "absent AGENTS.md",
 			agents: fact.Absent[string](),
 			canon:  fact.Present("# AGENTS.md\n"),

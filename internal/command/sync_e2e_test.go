@@ -164,3 +164,58 @@ func TestSyncAgainstTheLiveSourceKeepsAGENTSMDWhenTheSourceIsUnobtainable(t *tes
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
 	}
 }
+
+func TestSyncAgainstTheLiveSourceKeepsPreservedBlocks(t *testing.T) {
+	canonical := liveCanonical(t)
+	boost := "<laravel-boost-guidelines>\n=== foundation rules ===\n\n```php\n</laravel-boost-guidelines>\n```\n</laravel-boost-guidelines>"
+	next := "<!-- BEGIN:nextjs-agent-rules -->\n\n## This is NOT the Next.js you know\n\n<!-- END:nextjs-agent-rules -->"
+	want := canonical
+	if !strings.HasSuffix(want, "\n") {
+		want += "\n"
+	}
+	want += "\n" + boost + "\n\n" + next + "\n"
+
+	dir := t.TempDir()
+	stale := boost + "\n# stale\n```text\n<fenced>\n```\n" + next + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(stale), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	code, stdout, stderr := runCommand(t, nil, "sync")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit code = %d, stderr = %q, want 0 and empty (stdout = %q)", code, stderr, stdout)
+	}
+	content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("reading AGENTS.md: %v", err)
+	}
+	if string(content) != want {
+		t.Fatalf("AGENTS.md does not hold the live canonical document followed by the preserved blocks:\n%s", content)
+	}
+
+	code, stdout, stderr = runCommand(t, nil, "sync")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "up to date") {
+		t.Fatalf("second sync: exit code = %d, stdout = %q, stderr = %q, want an up-to-date indication", code, stdout, stderr)
+	}
+}
+
+func TestSyncAgainstTheLiveSourceStopsAtAnUnclosedOpeningLine(t *testing.T) {
+	dir := t.TempDir()
+	local := "# stale\n<laravel-boost-guidelines>\nrules\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(local), 0o644); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	code, stdout, _ := runCommand(t, nil, "sync")
+	if code != 2 || !strings.Contains(stdout, "line 2") {
+		t.Fatalf("exit code = %d, stdout = %q, want 2 and an error line naming line 2", code, stdout)
+	}
+	if content, err := os.ReadFile(filepath.Join(dir, "AGENTS.md")); err != nil || string(content) != local {
+		t.Fatalf("AGENTS.md = %q, err = %v, want it unmodified", content, err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".replworks")); !os.IsNotExist(err) {
+		t.Fatalf(".replworks stat err = %v, want it absent", err)
+	}
+}

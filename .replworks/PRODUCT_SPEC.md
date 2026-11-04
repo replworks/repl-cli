@@ -8,7 +8,7 @@
 - repl-cli installs the canonical AGENTS.md into a directory.
 - repl-cli reports task progress read from TASKS.md.
 - repl-cli verifies a project against a fixed set of rules.
-- repl-cli replaces a project's AGENTS.md with the canonical AGENTS.md.
+- repl-cli replaces a project's AGENTS.md with the canonical AGENTS.md while keeping its preserved blocks.
 - Project directory: the current working directory in which a command runs.
 - REPL Works project: a project directory that contains AGENTS.md and a .replworks/ directory.
 
@@ -48,6 +48,11 @@
 - Base branch: the git branch against which the working tree is compared. The default is main.
 - UNVERIFIED mark: the text [UNVERIFIED] within a heading line of .replworks/PRODUCT_SPEC.md, .replworks/TECH_STACK.md, or .replworks/ARCHITECTURE.md in the working tree.
 - Violation: a failed result of one rule in FR-013 through FR-017.
+- Fenced code block: a run of lines that opens with a line of three or more backticks or tildes and closes with a line of the same character in at least the same count. An unclosed fenced code block extends to the end of the text.
+- Block opening line: a line outside any fenced code block whose entire content is either `<name>` or `<!-- BEGIN:name -->`, with no indentation and no other text. In `<name>`, name starts with a letter and contains only letters, digits, `_`, and `-`. In `<!-- BEGIN:name -->`, name starts with a letter or digit and contains only letters, digits, `_`, `.`, and `-`. A line whose content also appears as a block opening line in the canonical AGENTS.md is not a block opening line.
+- Block closing line: a line outside any fenced code block whose entire content is `</name>` for an opening line `<name>`, or `<!-- END:name -->` for an opening line `<!-- BEGIN:name -->`, with the same name, no indentation, and no other text.
+- Preserved block: the lines of AGENTS.md from a block opening line through the first following block closing line for the same name, inclusive. Lines between them are not examined for further opening lines.
+- Expected AGENTS.md: the canonical AGENTS.md content when AGENTS.md contains no preserved block. Otherwise the canonical AGENTS.md content, ending with a line break, followed by each preserved block in its AGENTS.md order, each preceded by one empty line and followed by a line break.
 
 ## Outputs
 
@@ -56,7 +61,7 @@
 - AGENTS.md file and .replworks/ directory created by repl init.
 - `.replworks/scripts/ask-human.sh` created or replaced by init and sync.
 - `.replworks/docs/IDEAS.md` and `.replworks/docs/PITCHING_SCRIPT.md` created empty by init when absent.
-- AGENTS.md file replaced by repl sync.
+- AGENTS.md file replaced by repl sync with the expected AGENTS.md.
 
 ## Constraints
 
@@ -99,7 +104,7 @@
   - Output: none.
   - Exit: not applicable.
 - EL-005: repl sync
-  - Purpose: replace AGENTS.md with the canonical AGENTS.md.
+  - Purpose: replace AGENTS.md with the expected AGENTS.md.
   - Input: none.
   - Output: an indication that AGENTS.md is up to date or a line-by-line difference, plus the helper script's created or replaced state.
   - Exit: 0 on completion, 2 on execution error.
@@ -143,7 +148,7 @@
 - FR-014: repl check MUST report a violation of rule task-ids-unchanged for each task ID that exists in TASKS.md on the base branch and does not exist in TASKS.md in the working tree.
 - FR-015: repl check MUST report a violation of rule single-task-completion when the working tree contains more than one newly complete task.
 - FR-016: repl check MUST report a violation of rule no-unverified for each UNVERIFIED mark when the working tree contains at least one newly complete task.
-- FR-017: repl check MUST report a violation of rule agents-canonical when the content of AGENTS.md differs from the canonical AGENTS.md.
+- FR-017: repl check MUST report a violation of rule agents-canonical when the content of AGENTS.md differs from the expected AGENTS.md, or when AGENTS.md contains a block opening line without a following block closing line for the same name. In the second case the message MUST contain the line number of that opening line.
 - FR-018: repl check MUST print each violation on its own line containing the rule identifier, the file path, and a message.
 - FR-019: repl check MUST NOT modify any file.
 - FR-020: repl check MUST use main as the base branch when EL-004 is not given.
@@ -157,10 +162,11 @@
 ### sync
 
 - FR-027: repl sync MUST use `https://www.repl.net/documents/agents.md` as its canonical content without prompting for a selection.
-- FR-028: repl sync MUST NOT modify AGENTS.md when its content is identical to the canonical document.
-- FR-029: repl sync MUST print an indication that AGENTS.md is up to date when its content is identical to the canonical document.
-- FR-030: repl sync MUST print the line-by-line difference between the local AGENTS.md and the canonical document when the contents differ.
-- FR-031: repl sync MUST replace the content of AGENTS.md with the canonical document's content when the contents differ.
+- FR-028: repl sync MUST NOT modify AGENTS.md when its content is identical to the expected AGENTS.md.
+- FR-029: repl sync MUST print an indication that AGENTS.md is up to date when its content is identical to the expected AGENTS.md.
+- FR-030: repl sync MUST print the line-by-line difference between the local AGENTS.md and the expected AGENTS.md when the contents differ.
+- FR-031: repl sync MUST replace the content of AGENTS.md with the expected AGENTS.md when the contents differ.
+- FR-045: repl sync MUST keep the content of every preserved block byte for byte.
 - FR-039: repl sync MUST create or replace `.replworks/scripts/ask-human.sh` with the exact published script response on every invocation.
 - FR-040: repl sync MUST replace an existing helper script with the exact published script response, even when AGENTS.md is already up to date.
 - FR-041: The helper script installed by repl init MUST have execute permission whether it is created or replaced.
@@ -178,7 +184,7 @@
 - Flow 1: the user runs repl init in an empty directory -> AGENTS.md contains the canonical document, the helper script is installed, and .replworks/ exists -> the user runs repl check.
 - Flow 2: the user runs repl status -> the user reads the number of complete tasks and the next task ID.
 - Flow 3: the user runs repl check in a continuous integration job -> the job fails when the exit code is not 0.
-- Flow 4: the user runs repl sync -> the user reads the difference -> AGENTS.md and the helper script match their canonical sources.
+- Flow 4: the user runs repl sync -> the user reads the difference -> AGENTS.md equals the expected AGENTS.md and the helper script matches its published source.
 
 ## Error Conditions
 
@@ -211,6 +217,10 @@
   - repl-cli MUST exit with code 2.
 - ERR-006: Reserved; init does not read interactive input.
 - ERR-007: Reserved; sync does not read interactive input.
+- ERR-008: AGENTS.md contains a block opening line without a following block closing line for the same name when repl sync runs.
+  - repl sync MUST NOT modify any file.
+  - repl sync MUST print an error line containing the line number of that opening line.
+  - repl sync MUST exit with code 2.
 
 ## Non-Goals
 
@@ -231,7 +241,7 @@
 - AC-009: Given a working tree in which two tasks are newly complete, when repl check runs, then one line reports rule single-task-completion. (FR-015, EL-003)
 - AC-010: Given a working tree in which one task is newly complete and one UNVERIFIED mark exists, when repl check runs, then one line reports rule no-unverified for that mark. (FR-016, EL-003)
 - AC-011: Given a working tree in which no task is newly complete and one UNVERIFIED mark exists, when repl check runs, then no line reports rule no-unverified. (FR-016, EL-003)
-- AC-012: Given an AGENTS.md that differs from the canonical AGENTS.md, when repl check runs, then one line reports rule agents-canonical. (FR-017, EL-003)
+- AC-012: Given an AGENTS.md that differs from the expected AGENTS.md, when repl check runs, then one line reports rule agents-canonical. (FR-017, EL-003)
 - AC-013: Given a project that violates no rule, when repl check runs, then the exit code is 0. (FR-024, EL-003)
 - AC-014: Given a project that violates at least one rule and has no execution error, when repl check runs, then the exit code is 1. (FR-025, EL-003)
 - AC-015: Given no EL-004 option, when repl check runs, then the comparison uses the branch main. (FR-020, EL-003)
@@ -239,8 +249,8 @@
 - AC-017: Given a TASKS.md that does not exist on the base branch, when repl check runs, then every complete task in the working tree is a newly complete task. (FR-022, EL-003)
 - AC-018: Given a project directory without TASKS.md, when repl check runs, then no line reports rules task-ids-unchanged, single-task-completion, or no-unverified. (FR-023, EL-003)
 - AC-019: Given a project directory, when repl check runs, then no file is modified. (FR-019, EL-003)
-- AC-020: Given an AGENTS.md identical to the canonical document, when repl sync runs, then AGENTS.md is unmodified, the output indicates that it is up to date, the helper script is replaced with the live source, and the exit code is 0. (FR-027 through FR-031, FR-039, FR-040, EL-005)
-- AC-021: Given an AGENTS.md that differs from the canonical document, when repl sync runs, then the output contains the line-by-line difference, AGENTS.md equals the canonical document, the helper script is replaced with the live source, and the exit code is 0. (FR-027, FR-029 through FR-031, FR-039, FR-040, EL-005)
+- AC-020: Given an AGENTS.md identical to the expected AGENTS.md, when repl sync runs, then AGENTS.md is unmodified, the output indicates that it is up to date, the helper script is replaced with the live source, and the exit code is 0. (FR-027 through FR-031, FR-039, FR-040, EL-005)
+- AC-021: Given an AGENTS.md that differs from the expected AGENTS.md, when repl sync runs, then the output contains the line-by-line difference, AGENTS.md equals the expected AGENTS.md, the helper script is replaced with the live source, and the exit code is 0. (FR-027, FR-029 through FR-031, FR-039, FR-040, EL-005)
 - AC-041: Given an empty directory, repl init creates `.replworks/scripts/ask-human.sh` with the exact live script response.
 - AC-042: Given an existing helper script, repl init replaces its content with the exact live script response while leaving an existing AGENTS.md unchanged.
 - AC-043: Given either identical or differing AGENTS.md content, repl sync replaces an existing helper script with the exact live response and ensures execute permission.
@@ -266,3 +276,8 @@
 - AC-040: Given a .replworks/ directory that contains some but not all of the four documents, when repl init runs, then each missing document is created empty, each existing document is unchanged and reported as skipped, and the exit code is 0. (FR-003, FR-006, FR-036, EL-001)
 - AC-045: Given a project without `.replworks/docs/`, `repl init` creates the directory and empty `IDEAS.md` and `PITCHING_SCRIPT.md` files, and reports each created path.
 - AC-046: Given either human-edited file already exists with content, `repl init` reports it as skipped and preserves its content byte for byte. `repl sync` also leaves both files unchanged.
+- AC-047: Given an AGENTS.md that contains non-canonical text and a `<laravel-boost-guidelines>` … `</laravel-boost-guidelines>` block, when repl sync runs, then AGENTS.md equals the canonical content followed by one empty line and that block byte for byte, and the exit code is 0. (FR-031, FR-045, EL-005)
+- AC-048: Given an AGENTS.md that contains a `<!-- BEGIN:nextjs-agent-rules -->` … `<!-- END:nextjs-agent-rules -->` block, when repl sync runs, then that block is kept byte for byte after the canonical content. (FR-031, FR-045, EL-005)
+- AC-049: Given an AGENTS.md whose `<name>` and `</name>` lines appear only inside a fenced code block, indented, or with other text on the same line, when repl sync runs, then AGENTS.md equals the canonical content. (FR-031, EL-005)
+- AC-050: Given an AGENTS.md that equals the expected AGENTS.md, when repl sync runs twice, then AGENTS.md is unmodified and the output indicates that it is up to date both times; when repl check runs, no line reports rule agents-canonical. (FR-017, FR-028, FR-029, EL-003, EL-005)
+- AC-051: Given an AGENTS.md with a block opening line on line N and no following block closing line for the same name, when repl sync runs, then no file is modified, an error line containing N is printed, and the exit code is 2; when repl check runs, one line reports rule agents-canonical with N in its message. (FR-017, ERR-008, EL-003, EL-005)
