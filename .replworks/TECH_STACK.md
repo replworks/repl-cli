@@ -74,7 +74,8 @@
   - `go vet ./...`
   - `golangci-lint run`
   - `go test ./...`
-- GitHub Actions MUST run the verification commands on ubuntu and macOS.
+- GitHub Actions MUST run the verification commands on ubuntu for every push to main and every pull request.
+- GitHub Actions MUST also run the verification commands on the GitHub-hosted macOS runner for every release, and for every push to main and every same-repository pull request whose triggering actor is `cable8mm` or `replworks-bot`.
 - GitHub Actions MUST read the Go version from go.mod.
 - GitHub Actions MUST install the newest patch release of the major.minor version read from go.mod.
 - GitHub Actions MUST run `govulncheck ./...`.

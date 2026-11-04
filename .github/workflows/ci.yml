@@ -22,7 +22,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.os || '["ubuntu-latest"]') }}
+        # macOS runs only for pushes and same-repository pull requests by
+        # cable8mm or replworks-bot. Every other change runs on ubuntu only.
+        os: ${{ fromJSON(inputs.os || ((github.actor == 'cable8mm' || github.actor == 'replworks-bot') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && '["ubuntu-latest","macos-latest"]' || '["ubuntu-latest"]')) }}
     steps:
       - uses: actions/checkout@v7
 
