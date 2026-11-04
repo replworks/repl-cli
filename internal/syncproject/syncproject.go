@@ -1,10 +1,12 @@
-// Package syncproject replaces AGENTS.md with the canonical AGENTS.md.
+// Package syncproject replaces AGENTS.md with the expected AGENTS.md: the
+// canonical AGENTS.md followed by the preserved blocks of the local AGENTS.md.
 package syncproject
 
 import (
 	"errors"
 	"fmt"
 
+	"github.com/replworks/repl-cli/internal/agentblock"
 	"github.com/replworks/repl-cli/internal/diff"
 	"github.com/replworks/repl-cli/internal/fact"
 )
@@ -71,25 +73,31 @@ func (c Coordinator) Run() Outcome {
 		return Outcome{Errors: []error{canonicalReason(canonical)}}
 	}
 
-	upToDate := local.Value() == canonical.Value()
-	var difference []diff.Entry
-	if !upToDate {
-		difference = c.Difference.Compare(local.Value(), canonical.Value())
-	}
-
 	scriptContent := ""
 	if c.ManageScript {
 		if c.Script == nil {
-			return Outcome{UpToDate: upToDate, Difference: difference, Errors: []error{errors.New("the ask-human.sh source is unavailable")}}
+			return Outcome{Errors: []error{errors.New("the ask-human.sh source is unavailable")}}
 		}
 		script := c.Script.Canonical()
 		if !script.IsPresent() {
-			return Outcome{UpToDate: upToDate, Difference: difference, Errors: []error{canonicalReason(script)}}
+			return Outcome{Errors: []error{canonicalReason(script)}}
 		}
 		scriptContent = script.Value()
 	}
+
+	expected, err := agentblock.Expected(local.Value(), canonical.Value())
+	if err != nil {
+		return Outcome{Errors: []error{err}}
+	}
+
+	upToDate := local.Value() == expected
+	var difference []diff.Entry
 	if !upToDate {
-		if err := c.Workspace.ReplaceFile(agentsPath, canonical.Value()); err != nil {
+		difference = c.Difference.Compare(local.Value(), expected)
+	}
+
+	if !upToDate {
+		if err := c.Workspace.ReplaceFile(agentsPath, expected); err != nil {
 			return Outcome{Difference: difference, Errors: []error{err}}
 		}
 	}

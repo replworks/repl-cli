@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/replworks/repl-cli/internal/agentblock"
 	"github.com/replworks/repl-cli/internal/fact"
 	"github.com/replworks/repl-cli/internal/ledger"
 	"github.com/replworks/repl-cli/internal/mark"
@@ -28,7 +29,7 @@ const RuleSingleTaskCompletion = "single-task-completion"
 const RuleNoUnverified = "no-unverified"
 
 // RuleAgentsCanonical is reported for an AGENTS.md that differs from the
-// canonical AGENTS.md.
+// expected AGENTS.md or contains an unclosed block opening line.
 const RuleAgentsCanonical = "agents-canonical"
 
 const (
@@ -212,7 +213,15 @@ func agentsCanonical(facts Facts) []Violation {
 	if !facts.Agents.IsPresent() || !facts.Canonical.IsPresent() {
 		return nil
 	}
-	if facts.Agents.Value() == facts.Canonical.Value() {
+	expected, err := agentblock.Expected(facts.Agents.Value(), facts.Canonical.Value())
+	if err != nil {
+		return []Violation{{
+			Rule:    RuleAgentsCanonical,
+			Path:    agentsPath,
+			Message: err.Error(),
+		}}
+	}
+	if facts.Agents.Value() == expected {
 		return nil
 	}
 

@@ -205,3 +205,49 @@ func TestRunKeepsTheDifferenceWhenReplacementFails(t *testing.T) {
 		t.Fatalf("trace = %q, want the read before the replacement", workspace.trace())
 	}
 }
+
+func TestRunKeepsPreservedBlocks(t *testing.T) {
+	block := "<!-- BEGIN:nextjs-agent-rules -->\nrules\n<!-- END:nextjs-agent-rules -->"
+	coord, _, workspace := coordinator(fact.Present("old\n"+block+"\n"), fact.Present("new\n"))
+
+	outcome := coord.Run()
+
+	if outcome.UpToDate || len(outcome.Errors) > 0 {
+		t.Fatalf("outcome = %+v, want a replacement without errors", outcome)
+	}
+	want := "new\n\n" + block + "\n"
+	if len(workspace.replaced) != 1 || workspace.replaced[0] != want {
+		t.Fatalf("replaced = %q, want %q", workspace.replaced, want)
+	}
+}
+
+func TestRunReportsUpToDateWithPreservedBlocks(t *testing.T) {
+	coord, _, workspace := coordinator(fact.Present("new\n\n<rules>\nbody\n</rules>\n"), fact.Present("new\n"))
+
+	outcome := coord.Run()
+
+	if !outcome.UpToDate || len(outcome.Difference) > 0 || len(outcome.Errors) > 0 {
+		t.Fatalf("outcome = %+v, want up to date", outcome)
+	}
+	if len(workspace.replaced) > 0 {
+		t.Fatalf("replaced = %q, want no write", workspace.replaced)
+	}
+}
+
+func TestRunMakesNoWriteForAnUnclosedOpeningLine(t *testing.T) {
+	coord, _, workspace := coordinator(fact.Present("old\n<rules>\nbody\n"), fact.Present("new\n"))
+	coord.ManageScript = true
+	coord.Script = &fakeSource{canonical: fact.Present("#!/bin/sh\n")}
+
+	outcome := coord.Run()
+
+	if len(outcome.Errors) != 1 || !strings.Contains(outcome.Errors[0].Error(), "line 2") {
+		t.Fatalf("errors = %v, want one error naming line 2", outcome.Errors)
+	}
+	if outcome.UpToDate || len(outcome.Difference) > 0 {
+		t.Fatalf("outcome = %+v, want no up-to-date state and no difference", outcome)
+	}
+	if workspace.trace() != "read AGENTS.md" {
+		t.Fatalf("trace = %q, want only the local read", workspace.trace())
+	}
+}
