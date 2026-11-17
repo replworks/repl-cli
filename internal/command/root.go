@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/replworks/repl-cli/internal/canon"
+	"github.com/replworks/repl-cli/internal/skill"
 )
 
 type App struct {
@@ -40,6 +41,15 @@ type runner struct {
 	status          int
 	canonicalSource *canon.Provider
 	scriptSource    *canon.Provider
+	skillsProvider  *skill.Provider
+}
+
+func (r *runner) skillSource() *skill.Provider {
+	if r.skillsProvider == nil {
+		r.skillsProvider = skill.New(r.app.HTTPClient)
+	}
+
+	return r.skillsProvider
 }
 
 func (r *runner) canonical(documents ...canon.Document) *canon.Provider {
@@ -66,7 +76,7 @@ func (r *runner) newRootCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "repl",
 		Short:         "Command-line program for REPL Works projects",
-		Long:          "repl operates on a REPL Works project directory: it installs the canonical AGENTS.md, reports task progress, verifies project rules, and updates AGENTS.md.",
+		Long:          "repl operates on a REPL Works project directory: it installs the canonical AGENTS.md, reports task progress, verifies project rules, updates AGENTS.md, and installs the five Agent Skills.",
 		Version:       r.app.versionString(),
 		SilenceErrors: true,
 		SilenceUsage:  true,
@@ -87,6 +97,7 @@ func (r *runner) newRootCommand() *cobra.Command {
 	root.AddCommand(r.newInitCommand())
 	root.AddCommand(r.newSyncCommand())
 	root.AddCommand(r.newCheckCommand())
+	root.AddCommand(r.newSkillsCommand())
 
 	return root
 }

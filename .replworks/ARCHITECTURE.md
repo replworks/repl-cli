@@ -17,6 +17,7 @@
 - **Authoritative Documents**: the five documents named in PRODUCT_SPEC.md.
 - **Canonical Text**: the canonical AGENTS.md content, obtained from the single published source defined in PRODUCT_SPEC.md.
 - **Helper Script Text**: the exact `ask-human.sh` content obtained from the published source defined in PRODUCT_SPEC.md.
+- **Skill File**: the verbatim bytes of one published Agent Skill, obtained from the skill URLs defined in PRODUCT_SPEC.md.
 - **Task Ledger**: the ordered list of task entries parsed from one TASKS.md text.
 - **Task Entry**: a task ID plus a completion state, as recognized by the Task Ledger Reader.
 - **Preserved Block** and **Expected Text**: the preserved block and expected AGENTS.md defined in PRODUCT_SPEC.md.
@@ -51,8 +52,9 @@ Command Interface
  ├─ Check Coordinator  → Project Workspace (Read), Canonical Document Provider,
  │                       Base Branch Reader, Task Ledger Reader,
  │                       Unverified Mark Scanner, Rule Evaluator
- └─ Sync Coordinator   → Project Workspace (Read+Write), Canonical Document Provider,
-                         Preserved Block Reader, Difference Calculator
+ ├─ Sync Coordinator   → Project Workspace (Read+Write), Canonical Document Provider,
+ │                       Preserved Block Reader, Difference Calculator
+ └─ Skills Sync Coordinator → Project Workspace (Read+Write), Skill Provider
 
 Rule Evaluator → Preserved Block Reader
 Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Document Line Classifier
@@ -303,6 +305,34 @@ Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Docu
   - Owns the block line grammar and the Expected Text composition.
   - Does not compare texts, does no I/O, and does not decide how an unclosed opening line is reported. Is pure.
 
+### C15. Skill Provider
+
+- Responsibilities:
+  - Obtain the five skill files from the URLs defined in PRODUCT_SPEC.md, in the fixed order repl-product-spec, repl-tech-stack, repl-architecture, repl-tasks, repl-auto-run.
+  - Return each skill exactly as the source content, with no normalization.
+  - Retrieve each skill at most once per invocation.
+  - Treat source unreachable, unsuccessful response, or an empty response as `Failed`.
+  - Keep the source representation private. Other components never see it.
+  - Inputs: the five skill URLs defined in PRODUCT_SPEC.md.
+  - Outputs: per skill, `Present(text) | Failed(reason)`.
+- Ownership boundaries:
+  - Owns all skill-related network access and the extraction of the skill files.
+  - Does not compare, write, print, or access any address other than the five skill URLs.
+
+### C16. Skills Sync Coordinator
+
+- Responsibilities:
+  - Gather the five skill facts in the fixed order defined in C15.
+  - When any skill fact is `Failed`: make no write; record one execution error per failed skill, in the fixed order; stop.
+  - Otherwise, for each skill in the fixed order: read the local file fact; keep an identical file untouched; create or replace a missing or differing file, creating parent directories as needed.
+  - Stop at the first write failure; report the skills installed before the failure; record an execution error.
+- Inputs: Request, the five skill facts, local file facts, the Workspace `Write` capability restricted to `.claude/skills/` paths and their parent directories.
+- Outputs: Outcome with one `(skill name, path, created | replaced | up to date)` entry per processed skill, and execution errors.
+- Ownership boundaries:
+  - Owns the fixed order of the skills, the all-or-nothing fetch, the create/replace/up-to-date decision, and the parent directory creation.
+  - Does not perform I/O itself, print, or compare content beyond exact equality.
+  - Holds the Workspace `Write` capability, restricted to `.claude/skills/` paths and their parent directories.
+
 ## 5. Component Responsibilities (summary)
 
 | Responsibility                              | Sole owner                                              |
@@ -311,8 +341,9 @@ Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Docu
 | Printed text, line order, exit status       | Command Interface                                       |
 | Choosing the order of work within a command | Each Coordinator                                        |
 | Reading files, presence checks              | Project Workspace                                       |
-| Creating and replacing files                | Project Workspace (Write granted only to Init and Sync) |
-| Network access                              | Canonical Document Provider                             |
+| Creating and replacing files                | Project Workspace (Write granted only to Init, Sync, and Skills Sync) |
+| Network access                              | Canonical Document Provider (canonical document, helper script), Skill Provider (skill files) |
+| Skill install order and outcome decision    | Skills Sync Coordinator                                |
 | Repository access                           | Base Branch Reader                                      |
 | Line numbering and fence recognition        | Document Line Classifier                                |
 | Task Entry grammar and ledger derivations   | Task Ledger Reader                                      |
@@ -327,7 +358,7 @@ Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Docu
 - Only the Command Interface prints or sets an exit status.
 - Coordinators return Outcomes; they never print.
 - Only the Project Workspace touches the file system.
-- Only the Canonical Document Provider touches the network.
+- Only the Canonical Document Provider and the Skill Provider touch the network.
 - Only the Base Branch Reader touches the repository.
 - Pure components (Document Line Classifier, Task Ledger Reader, Unverified Mark Scanner, Rule Evaluator, Difference Calculator) never perform I/O and never read time, environment, or global state.
 - The Rule Evaluator decides what is a violation. Coordinators decide what is an execution error. Neither does the other's job.
@@ -390,9 +421,22 @@ Request → Sync Coordinator
   → Command Interface → lines + status
 ```
 
+### skills sync
+
+```text
+Request → Skills Sync Coordinator
+  Skill Provider → skill facts × 5 (repl-product-spec, repl-tech-stack,
+                                  repl-architecture, repl-tasks, repl-auto-run)
+  [any Failed] → Outcome(errors), no write
+  [all Present] → Workspace Read × 5 → exact comparison
+    identical → Outcome(UpToDate)
+    different → Workspace Write: create or replace (parent directories created as needed)
+  → Outcome(per-skill states, errors) → Command Interface → lines + status
+```
+
 ### Exit status mapping (owned by Command Interface)
 
-- init, status, sync: 2 when the Outcome has at least one execution error, otherwise 0.
+- init, status, sync, skills sync: 2 when the Outcome has at least one execution error, otherwise 0.
 - check: 2 when at least one execution error exists, otherwise 1 when at least one violation exists, otherwise 0.
 - Unknown command or option: one error line and 2.
 
@@ -403,6 +447,7 @@ Request → Sync Coordinator
 - check: violation lines first (Rule Evaluator order), then execution error lines (gathering order). A violation line contains rule identifier, file path, message. An error line contains the subject and message.
 - sync: an up-to-date indication, or the difference lines, helper-script state line when changed, followed by any error line.
 - sync difference lines: removed lines are red and added lines are green for terminal output; non-terminal output is plain.
+- skills sync: one line per skill containing the skill name, the path, and created, replaced, or up to date; then any error lines.
 - All paths printed are relative to the Project Directory.
 
 ## 8. Architectural Rules
@@ -410,8 +455,8 @@ Request → Sync Coordinator
 - AR-01: One invocation executes exactly one command and keeps no information afterward.
 - AR-02: Every fact is exactly one of `Present`, `Absent`, `Failed`. `Absent` is never an error by itself. A coordinator turns `Failed` into an execution error and may turn `Absent` into an execution error only where PRODUCT_SPEC.md defines it (status without TASKS.md, sync without AGENTS.md).
 - AR-03: Pure components are deterministic: equal inputs yield equal outputs, including order.
-- AR-04: The Workspace `Write` capability is granted only to the Init and Sync Coordinators.
-- AR-05: The Canonical Text is retrieved at most once per invocation, and every consumer in the invocation uses that same result.
+- AR-04: The Workspace `Write` capability is granted only to the Init, Sync, and Skills Sync Coordinators. The Skills Sync Coordinator may write only under `.claude/skills/`.
+- AR-05: The Canonical Text is retrieved at most once per invocation, and every consumer in the invocation uses that same result. Each skill file is likewise retrieved at most once per invocation.
 - AR-06: A coordinator that must write obtains every fact it needs before its first write.
 - AR-07: Violations are produced only by the Rule Evaluator. Execution errors are produced only by coordinators from `Failed` facts or failed writes.
 - AR-08: A `Failed` fact disables only the rules that depend on it; independent rules still run.
@@ -438,6 +483,9 @@ Request → Sync Coordinator
 | AGENTS.md block opening line without closing line (sync)     | Preserved Block Reader                      | Sync Coordinator   | Execution error with the line number, no write                                                                          |
 | AGENTS.md block opening line without closing line (check)    | Preserved Block Reader                      | Rule Evaluator     | agents-canonical violation with the line number                                                                         |
 | Malformed task or heading lines                               | Task Ledger Reader, Unverified Mark Scanner | Same components    | Ignored. Parsing never fails                                                                                            |
+| A skill file cannot be obtained                               | Skill Provider                              | Skills Sync Coordinator | No write; one error line per failed skill; exit 2                                                                |
+| A local skill file cannot be read                             | Project Workspace                           | Skills Sync Coordinator | Stop; skills installed before the failure are reported; one error line; exit 2                                   |
+| A skill file cannot be written                                | Project Workspace                           | Skills Sync Coordinator | Stop; skills installed before the failure are reported; one error line; exit 2                                   |
 
 - Execution error: a fact could not be obtained or a write could not be performed.
 - Violation: a rule failed on facts that were obtained.
@@ -453,16 +501,17 @@ Request → Sync Coordinator
 - No resolution or ranking of conflicts between documents.
 - No interactive prompting during an invocation.
 - No pluggable output renderers or alternative output encodings.
+- No execution of installed skills, and no automatic discovery or installation of skills beyond the fixed five.
 
 ## 11. Architectural Invariants
 
 - Every file write is performed by the Project Workspace through a granted `Write` capability.
-- Only the Init and Sync Coordinators ever hold that capability.
-- Every network access is performed by the Canonical Document Provider.
+- Only the Init, Sync, and Skills Sync Coordinators ever hold that capability. The Skills Sync Coordinator writes only under `.claude/skills/`.
+- Every network access is performed by the Canonical Document Provider or the Skill Provider.
 - Every repository access is performed by the Base Branch Reader and is read-only.
 - Every printed line and every exit status is produced by the Command Interface.
 - Every violation is produced by the Rule Evaluator from facts, and every execution error from a `Failed` fact or failed write.
-- The Canonical Text used within one invocation is always one single retrieved result from the canonical source.
+- The Canonical Text used within one invocation is always one single retrieved result from the canonical source. Each skill file used within one invocation is likewise one single retrieved result.
 - Rule evaluation order and output order are always the fixed orders defined here.
 - Task Entry and Mark recognition always follow the single shared line and fence definition.
 - No component retains information between invocations.
