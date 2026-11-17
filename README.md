@@ -4,7 +4,8 @@ Command-line program for REPL Works projects.
 
 `repl` installs the canonical AGENTS.md into a project directory, reports task
 progress read from TASKS.md, verifies a project against a fixed set of rules,
-and replaces a project's AGENTS.md with the canonical AGENTS.md.
+replaces a project's AGENTS.md with the canonical AGENTS.md, and installs the
+five Agent Skills published on repl.net.
 
 ## Install
 
@@ -20,11 +21,26 @@ package from the [replworks APT repository](https://apt.repl.net).
 ## Usage
 
 ```sh
-repl init      # create AGENTS.md and the .replworks documents
-repl status    # report task progress from .replworks/TASKS.md
-repl check     # verify the project against the project rules
-repl sync      # replace AGENTS.md with the canonical AGENTS.md
+repl init          # create AGENTS.md and the .replworks documents
+repl status        # report task progress from .replworks/TASKS.md
+repl check         # verify the project against the project rules
+repl sync          # replace AGENTS.md with the canonical AGENTS.md
+repl skills sync   # install or update the five Agent Skills in .claude/skills/
 ```
+
+## Agent Skills
+
+Agent Skills are SKILL.md packages that AI agents can load on demand.
+`repl skills sync` downloads the five skills published on repl.net and installs
+them byte for byte under `.claude/skills/` of the project directory. Run it
+once after `repl init` and again whenever you want the skills refreshed:
+
+```sh
+repl skills sync
+```
+
+Skills included: `repl-product-spec`, `repl-tech-stack`, `repl-architecture`,
+`repl-tasks`, `repl-auto-run`.
 
 ## Build
 

@@ -236,10 +236,10 @@ Do not stop between tasks. Do not ask for approval to start a task.
 Before the first git operation of a session, ask the human to confirm
 the delivery identities. Fill in every value and ask in this form:
 
-Commit author/committer: <name> <noreply email>
-Co-authored-by: <human account> (only when the human took part in the change)
-PR creator / assignee: <bot account>
-Merger: <account>
+Commit author: <human name> <human email>
+Committer: <AI name> <noreply email>
+Co-authored-by: <AI name> <noreply email> (unless requested or driven by a human)
+PR creator / assignee / merger: <bot account>
 Is this correct?
 
 Fill missing values using available context, including `gh` commands. Show the
@@ -251,11 +251,11 @@ Per task:
 1. Pull main.
 2. Create branch `t-NNN-slug`.
 3. Implement and test (TASK_EXECUTION).
-4. Commit with the agent that wrote the code as author and committer
-   (name and noreply email of that agent).
-   Add a `Co-authored-by` trailer for the human account
-   when the human specified the change or answered a question about it,
-   in the session or on GitHub. Add no other `Co-authored-by` trailer.
+4. Commit with the human as author (name and email) and the agent that
+   wrote the code as committer (name and noreply email of that agent).
+   Add a `Co-authored-by` trailer for that agent
+   unless the change was requested or driven by a human.
+   Add no other `Co-authored-by` trailer.
 5. Open a PR as the bot account. Assignee: bot account.
 6. Squash merge only after every CI check on the PR has passed.
    Pending is not passed. If no CI is configured, there is no gate.
@@ -314,6 +314,9 @@ Report:  .replworks/observations/<YYYY-MM-DD>-<slug>.md
 ```
 
 Code and report share the same `<YYYY-MM-DD>-<slug>`.
+
+Probe reports are indexed in `.replworks/observations/README.md`.
+When a probe finishes or is retired, add or update its line there; the index shows current state only.
 
 ---
 

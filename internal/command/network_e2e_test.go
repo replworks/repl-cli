@@ -13,6 +13,7 @@ import (
 func TestCommandsRequestOnlyTheCanonicalSource(t *testing.T) {
 	tests := []struct {
 		name         string
+		args         []string
 		agents       string
 		documents    bool
 		wantRequests []string
@@ -21,6 +22,13 @@ func TestCommandsRequestOnlyTheCanonicalSource(t *testing.T) {
 		{name: "status", documents: true},
 		{name: "check", documents: true, wantRequests: []string{canon.SourceURL}},
 		{name: "sync", agents: "# stale\n", documents: true, wantRequests: []string{canon.SourceURL, string(canon.AskHumanScript)}},
+		{name: "skills sync", args: []string{"skills", "sync"}, wantRequests: []string{
+			"https://www.repl.net/skills/repl-product-spec/SKILL.md",
+			"https://www.repl.net/skills/repl-tech-stack/SKILL.md",
+			"https://www.repl.net/skills/repl-architecture/SKILL.md",
+			"https://www.repl.net/skills/repl-tasks/SKILL.md",
+			"https://www.repl.net/skills/repl-auto-run/SKILL.md",
+		}},
 	}
 
 	for _, tt := range tests {
@@ -42,7 +50,11 @@ func TestCommandsRequestOnlyTheCanonicalSource(t *testing.T) {
 
 			client, transport := liveRecordingClient()
 
-			if code, _, stderr := runCommand(t, client, tt.name); code != 0 {
+			args := tt.args
+			if args == nil {
+				args = []string{tt.name}
+			}
+			if code, _, stderr := runCommand(t, client, args...); code != 0 {
 				t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
 			}
 

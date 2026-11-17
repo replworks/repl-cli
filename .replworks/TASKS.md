@@ -318,3 +318,17 @@
     - Check reports no agents-canonical violation for an AGENTS.md equal to the expected AGENTS.md, and reports one with the line number for an unclosed opening line.
     - An E2E test runs sync against the live canonical source with an AGENTS.md that contains a preserved block and verifies the block is kept.
     - Unit tests for the Preserved Block Reader, Sync Coordinator, and Rule Evaluator pass.
+
+- [x] T-030 Install Agent Skills with repl skills sync
+  - Satisfies: PRODUCT_SPEC.md § User Interface / Commands (EL-006); § Functional Requirements / skills sync (FR-046 through FR-052); § Functional Requirements / all commands (FR-032, FR-033, FR-034, FR-053, FR-054); § Error Conditions (ERR-009, ERR-010); § Acceptance Criteria (AC-052 through AC-057, AC-031); ARCHITECTURE.md § Components (C6, C15, C16), § Architectural Rules (AR-04, AR-05, AR-06)
+  - External boundary: yes
+  - Acceptance criteria:
+    - The live skill URLs are observed before the command is mocked.
+    - An E2E test exercises skills sync through the live skill URLs. Given an empty directory, `.claude/skills/<name>/SKILL.md` exists for each of the five skills, each byte-identical to its live response, and the exit code is 0.
+    - Given identical skill files, no file is created, modified, or deleted, each skill is reported as already up to date, and the exit code is 0.
+    - Given one unreachable skill URL, no file is created or modified, one error line per unreachable skill is printed, and the exit code is 2.
+    - Given a mix of identical and differing skill files, only the differing files are created or replaced.
+    - Only repl skills sync writes under `.claude/`; init, status, check, and sync leave `.claude/` untouched.
+    - Every command requests only the addresses its function requires; repl skills sync requests only the five skill URLs.
+    - Unit tests for Skill Provider and Skills Sync Coordinator, and command-level output tests, pass.
+    - gofmt, go vet, golangci-lint, go test ./... pass.

@@ -39,6 +39,12 @@
 - Canonical AGENTS.md document: https://www.repl.net/documents/agents.md
 - Helper script:
   - https://www.repl.net/scripts/ask-human.sh
+- Agent Skills:
+  - https://www.repl.net/skills/repl-product-spec/SKILL.md
+  - https://www.repl.net/skills/repl-tech-stack/SKILL.md
+  - https://www.repl.net/skills/repl-architecture/SKILL.md
+  - https://www.repl.net/skills/repl-tasks/SKILL.md
+  - https://www.repl.net/skills/repl-auto-run/SKILL.md
 - `repl init` and `repl sync` always use the canonical AGENTS.md document and install the helper script from its published source.
 - Authoritative documents: the five files AGENTS.md, .replworks/PRODUCT_SPEC.md, .replworks/TECH_STACK.md, .replworks/ARCHITECTURE.md, .replworks/TASKS.md.
 - Task: an entry in TASKS.md that has a task ID and a completion state.
@@ -62,6 +68,7 @@
 - `.replworks/scripts/ask-human.sh` created or replaced by init and sync.
 - `.replworks/docs/IDEAS.md` and `.replworks/docs/PITCHING_SCRIPT.md` created empty by init when absent.
 - AGENTS.md file replaced by repl sync with the expected AGENTS.md.
+- `.claude/skills/<name>/SKILL.md` created or replaced by repl skills sync.
 
 ## Constraints
 
@@ -73,6 +80,16 @@
   - Relied behavior: serves the canonical AGENTS.md content used by init, sync, and check.
 - https://www.repl.net/scripts/ask-human.sh
   - Relied behavior: serves the exact script content installed by init and sync.
+- https://www.repl.net/skills/repl-product-spec/SKILL.md
+  - Relied behavior: serves the verbatim skill file installed by skills sync for repl-product-spec.
+- https://www.repl.net/skills/repl-tech-stack/SKILL.md
+  - Relied behavior: serves the verbatim skill file installed by skills sync for repl-tech-stack.
+- https://www.repl.net/skills/repl-architecture/SKILL.md
+  - Relied behavior: serves the verbatim skill file installed by skills sync for repl-architecture.
+- https://www.repl.net/skills/repl-tasks/SKILL.md
+  - Relied behavior: serves the verbatim skill file installed by skills sync for repl-tasks.
+- https://www.repl.net/skills/repl-auto-run/SKILL.md
+  - Relied behavior: serves the verbatim skill file installed by skills sync for repl-auto-run.
 - Git repository of the project directory
   - Relied behavior: provides the content of TASKS.md on the base branch.
 
@@ -107,6 +124,11 @@
   - Purpose: replace AGENTS.md with the expected AGENTS.md.
   - Input: none.
   - Output: an indication that AGENTS.md is up to date or a line-by-line difference, plus the helper script's created or replaced state.
+  - Exit: 0 on completion, 2 on execution error.
+- EL-006: repl skills sync
+  - Purpose: create or update the five Agent Skills in the project directory.
+  - Input: none.
+  - Output: one line per skill, containing the skill name, the file path relative to the project directory, and whether the skill file was created, replaced, or is already up to date; one line per execution error.
   - Exit: 0 on completion, 2 on execution error.
 
 ### Rule Identifiers
@@ -173,11 +195,23 @@
 - FR-042: The helper script installed by repl sync MUST have execute permission whether it is created or replaced.
 - FR-035: repl sync MUST render removed difference lines in red and added difference lines in green when its output is a terminal, and MUST render plain difference lines otherwise.
 
+### skills sync
+
+- FR-046: repl skills sync MUST download the skill file for each of the five skills from its published URL and store it byte for byte at `.claude/skills/<name>/SKILL.md`, creating parent directories as needed.
+- FR-047: repl skills sync MUST obtain all five skill files before writing any of them.
+- FR-048: repl skills sync MUST NOT modify a skill file whose content is identical to the downloaded bytes.
+- FR-049: repl skills sync MUST print one line per skill, containing the skill name, the file path relative to the project directory, and whether the skill was created, replaced, or is already up to date.
+- FR-050: repl skills sync MUST stop at the first write failure and report an execution error; skills installed before the failure remain and are reported.
+- FR-051: repl skills sync MUST NOT access any network resource other than the five skill URLs.
+- FR-052: repl skills sync MUST NOT write any file other than the five skill files and their parent directories.
+
 ### all commands
 
 - FR-032: Every command MUST operate only on the project directory.
-- FR-033: repl-cli MUST NOT access any network resource other than `https://www.repl.net/documents/agents.md` and `https://www.repl.net/scripts/ask-human.sh`.
-- FR-034: Only repl init and repl sync MUST write files.
+- FR-033: repl-cli MUST NOT access any network resource other than the canonical AGENTS.md document, the helper script, and the five skill URLs. Each command MUST request only the addresses its function requires: init and sync request the canonical AGENTS.md document and the helper script URL; check requests only the canonical AGENTS.md document; skills sync requests only the five skill URLs; status requests none.
+- FR-034: Only repl init, repl sync, and repl skills sync MUST write files.
+- FR-053: Every command other than repl skills sync MUST NOT create, modify, or delete anything under `.claude/`.
+- FR-054: repl skills sync MUST NOT create, modify, or delete anything under `.claude/` other than the five skill files and their parent directories.
 
 ## User Flows
 
@@ -185,6 +219,7 @@
 - Flow 2: the user runs repl status -> the user reads the number of complete tasks and the next task ID.
 - Flow 3: the user runs repl check in a continuous integration job -> the job fails when the exit code is not 0.
 - Flow 4: the user runs repl sync -> the user reads the difference -> AGENTS.md equals the expected AGENTS.md and the helper script matches its published source.
+- Flow 5: the user runs repl skills sync -> the user reads one line per skill -> the five skill files exist under .claude/skills/ and match their published sources.
 
 ## Error Conditions
 
@@ -221,12 +256,21 @@
   - repl sync MUST NOT modify any file.
   - repl sync MUST print an error line containing the line number of that opening line.
   - repl sync MUST exit with code 2.
+- ERR-009: A skill file cannot be obtained from its published URL when repl skills sync runs.
+  - repl skills sync MUST NOT create or modify any file.
+  - repl skills sync MUST print an error line per skill that could not be obtained.
+  - repl skills sync MUST exit with code 2.
+- ERR-010: A skill file cannot be written when repl skills sync runs.
+  - repl skills sync MUST report the skills that were installed before the failure.
+  - repl skills sync MUST print an error line.
+  - repl skills sync MUST exit with code 2.
 
 ## Non-Goals
 
 - repl-cli MUST NOT execute AI models.
 - repl-cli MUST NOT store runtime state or project state.
 - repl-cli MUST NOT verify browser tests for graphical-interface tasks.
+- repl skills sync MUST NOT execute the skills it installs.
 
 ## Acceptance Criteria
 
@@ -264,7 +308,7 @@
 - AC-028: Given a project directory without AGENTS.md, when repl sync runs, then no file is created, an error line is printed, and the exit code is 2. (ERR-004, EL-005)
 - AC-029: Given an unknown command, when repl-cli runs, then no file is modified, an error line is printed, and the exit code is 2. (ERR-005)
 - AC-030: Given an unknown option, when repl-cli runs, then no file is modified, an error line is printed, and the exit code is 2. (ERR-005)
-- AC-031: Given any command, when it runs, then no network request is sent to any address other than the canonical document URL and helper script URL; init requests both, sync requests neither when AGENTS.md is absent and both otherwise, and check requests only the canonical document URL. (FR-033)
+- AC-031: Given any command, when it runs, then no network request is sent to any address other than the canonical document URL, the helper script URL, and the five skill URLs; init requests the canonical document and the helper script URL; sync requests neither when AGENTS.md is absent and both otherwise; check requests only the canonical document URL; skills sync requests only the five skill URLs; status requests none. (FR-033)
 - AC-032: Given repl status or repl check, when it runs, then no file is created, modified, or deleted. (FR-012, FR-019, FR-034)
 - AC-033: Given an empty directory, repl init installs the canonical AGENTS.md and helper script without reading stdin, and exits with code 0. (FR-001, FR-002, FR-037, EL-001)
 - AC-034: Given any stdin contents, repl init does not prompt or require a selection and completes according to the canonical source results. (FR-001, FR-038, EL-001)
@@ -281,3 +325,9 @@
 - AC-049: Given an AGENTS.md whose `<name>` and `</name>` lines appear only inside a fenced code block, indented, or with other text on the same line, when repl sync runs, then AGENTS.md equals the canonical content. (FR-031, EL-005)
 - AC-050: Given an AGENTS.md that equals the expected AGENTS.md, when repl sync runs twice, then AGENTS.md is unmodified and the output indicates that it is up to date both times; when repl check runs, no line reports rule agents-canonical. (FR-017, FR-028, FR-029, EL-003, EL-005)
 - AC-051: Given an AGENTS.md with a block opening line on line N and no following block closing line for the same name, when repl sync runs, then no file is modified, an error line containing N is printed, and the exit code is 2; when repl check runs, one line reports rule agents-canonical with N in its message. (FR-017, ERR-008, EL-003, EL-005)
+- AC-052: Given an empty project directory, when repl skills sync runs, then `.claude/skills/repl-product-spec/SKILL.md` through `.claude/skills/repl-auto-run/SKILL.md` exist, each byte-identical to its published skill file, one line per skill is printed, and the exit code is 0. (EL-006, FR-046, FR-049)
+- AC-053: Given skill files identical to the published bytes, when repl skills sync runs, then no file is created, modified, or deleted, each skill is reported as already up to date, and the exit code is 0. (FR-048, FR-049)
+- AC-054: Given one unreachable skill URL, when repl skills sync runs, then no file is created or modified, one error line per unreachable skill is printed, and the exit code is 2. (ERR-009, FR-047)
+- AC-055: Given any command other than repl skills sync, when it runs, then no file under `.claude/` is created, modified, or deleted. (FR-053)
+- AC-056: Given repl skills sync, when it runs, then the only addresses requested are the five skill URLs. (FR-051)
+- AC-057: Given a mix of identical and differing skill files, when repl skills sync runs, then only the differing files are created or replaced and each skill is reported with its outcome. (FR-046, FR-048, FR-049)
