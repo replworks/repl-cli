@@ -319,7 +319,7 @@
     - An E2E test runs sync against the live canonical source with an AGENTS.md that contains a preserved block and verifies the block is kept.
     - Unit tests for the Preserved Block Reader, Sync Coordinator, and Rule Evaluator pass.
 
-- [ ] T-030 Install Agent Skills with repl skills sync
+- [x] T-030 Install Agent Skills with repl skills sync
   - Satisfies: PRODUCT_SPEC.md § User Interface / Commands (EL-006); § Functional Requirements / skills sync (FR-046 through FR-052); § Functional Requirements / all commands (FR-032, FR-033, FR-034, FR-053, FR-054); § Error Conditions (ERR-009, ERR-010); § Acceptance Criteria (AC-052 through AC-057, AC-031); ARCHITECTURE.md § Components (C6, C15, C16), § Architectural Rules (AR-04, AR-05, AR-06)
   - External boundary: yes
   - Acceptance criteria:
