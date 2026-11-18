@@ -1110,3 +1110,149 @@ func TestCheckPrintsViolationsInRuleOrderBeforeErrors(t *testing.T) {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
 	}
 }
+
+func TestCheckReportsADuplicateDefinition(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeDocument(t, dir, filepath.Join(".replworks", "PRODUCT_SPEC.md"), "# PRODUCT_SPEC.md\n- FR-001: first\n- FR-001: second\n")
+	initRepository(t, dir)
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q, stderr = %q)", code, stdout, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	lines := errorLines(t, stdout)
+	want := []string{
+		"duplicate-definition .replworks/PRODUCT_SPEC.md: identifier FR-001 is defined on lines 2, 3",
+	}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+}
+
+func TestCheckReportsAnUnresolvedReference(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeDocument(t, dir, filepath.Join(".replworks", "PRODUCT_SPEC.md"), "# PRODUCT_SPEC.md\n- AC-001: given\n")
+	writeDocument(t, dir, filepath.Join(".replworks", "TASKS.md"), "# TASKS.md\n- [ ] T-001 references AC-999 and FR-999 and C99\n")
+	initRepository(t, dir)
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+	before := directoryState(t, dir)
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q, stderr = %q)", code, stdout, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	lines := errorLines(t, stdout)
+	want := []string{
+		"unresolved-reference .replworks/TASKS.md: identifier AC-999 is referenced but never defined (first appearance on line 2)",
+		"unresolved-reference .replworks/TASKS.md: identifier FR-999 is referenced but never defined (first appearance on line 2)",
+		"unresolved-reference .replworks/TASKS.md: identifier C99 is referenced but never defined (first appearance on line 2)",
+	}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("stdout = %q, want %q", stdout, want)
+	}
+	if after := directoryState(t, dir); after != before {
+		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
+	}
+}
+
+func TestCheckExitsZeroWhenReferencesResolve(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeDocument(t, dir, filepath.Join(".replworks", "PRODUCT_SPEC.md"), "# PRODUCT_SPEC.md\n- AC-001: given\n- FR-001: given\n")
+	writeDocument(t, dir, filepath.Join(".replworks", "ARCHITECTURE.md"), "# ARCHITECTURE.md\n### C1. Command Interface\n")
+	writeDocument(t, dir, filepath.Join(".replworks", "TASKS.md"), "# TASKS.md\n- [ ] T-001 references AC-001 and FR-001 and C1\n")
+	initRepository(t, dir)
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if strings.Contains(stdout, "unresolved-reference") || strings.Contains(stdout, "duplicate-definition") {
+		t.Fatalf("stdout = %q, want no cross-reference violations", stdout)
+	}
+}
+
+func TestCheckDoesNotReportUnresolvedReferenceWithoutTasksInTheWorkingTree(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	initRepository(t, dir)
+	if err := os.Remove(filepath.Join(dir, ".replworks", "TASKS.md")); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if !strings.Contains(stdout, "documents-exist .replworks/TASKS.md") {
+		t.Fatalf("stdout = %q, want a documents-exist line for TASKS.md", stdout)
+	}
+	if strings.Contains(stdout, "unresolved-reference") {
+		t.Fatalf("stdout = %q, want no unresolved-reference line", stdout)
+	}
+}
+
+func TestCheckDoesNotReportCrossReferenceRulesWhenADocumentIsUnreadable(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeDocument(t, dir, filepath.Join(".replworks", "TASKS.md"), "# TASKS.md\n- [ ] T-001 references AC-999\n")
+	initRepository(t, dir)
+	spec := filepath.Join(dir, ".replworks", "PRODUCT_SPEC.md")
+	if err := os.Remove(spec); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.Mkdir(spec, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "check")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stdout = %q)", code, stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+	if !strings.Contains(stdout, "repl: reading .replworks/PRODUCT_SPEC.md") {
+		t.Fatalf("stdout = %q, want an error line for the unreadable document", stdout)
+	}
+	if strings.Contains(stdout, "unresolved-reference") || strings.Contains(stdout, "duplicate-definition") {
+		t.Fatalf("stdout = %q, want no cross-reference violation lines", stdout)
+	}
+}
