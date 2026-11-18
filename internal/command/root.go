@@ -101,6 +101,7 @@ func (r *runner) newRootCommand() *cobra.Command {
 	root.AddCommand(r.newCheckCommand())
 	root.AddCommand(r.newSkillsCommand())
 	root.AddCommand(r.newShowCommand())
+	root.AddCommand(r.newNextCommand())
 
 	return root
 }
