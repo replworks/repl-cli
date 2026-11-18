@@ -9,6 +9,7 @@
 - repl-cli reports task progress read from TASKS.md.
 - repl-cli verifies a project against a fixed set of rules.
 - repl-cli replaces a project's AGENTS.md with the canonical AGENTS.md while keeping its preserved blocks.
+- repl-cli prints the definition excerpts of the next task and of the identifiers it references, so an agent can read only the parts of the authoritative documents that a task needs.
 - Project directory: the current working directory in which a command runs.
 - REPL Works project: a project directory that contains AGENTS.md and a .replworks/ directory.
 
@@ -17,6 +18,7 @@
 - AGENTS.md is copied unchanged into every REPL Works project.
 - No program verifies that a project follows the rules defined by AGENTS.md.
 - No program verifies that a project's AGENTS.md matches the canonical AGENTS.md.
+- An agent reads every authoritative document in full for every task, even when a task needs only a few definitions.
 
 ## Product Goals
 
@@ -24,6 +26,7 @@
 - The product MUST enable the user to see how many tasks are complete.
 - The product MUST enable the user to detect violations of the rules in FR-013 through FR-017, FR-055, and FR-056.
 - The product MUST enable the user to update AGENTS.md to the canonical AGENTS.md.
+- The product MUST enable the user to read the next task and the definitions it references without reading whole documents.
 
 ## Users
 
@@ -58,6 +61,12 @@
 - Block opening line: a line outside any fenced code block whose entire content is either `<name>` or `<!-- BEGIN:name -->`, with no indentation and no other text. In `<name>`, name starts with a letter and contains only letters, digits, `_`, and `-`. In `<!-- BEGIN:name -->`, name starts with a letter or digit and contains only letters, digits, `_`, `.`, and `-`. A line whose content also appears as a block opening line in the canonical AGENTS.md is not a block opening line.
 - Block closing line: a line outside any fenced code block whose entire content is `</name>` for an opening line `<name>`, or `<!-- END:name -->` for an opening line `<!-- BEGIN:name -->`, with the same name, no indentation, and no other text.
 - Preserved block: the lines of AGENTS.md from a block opening line through the first following block closing line for the same name, inclusive. Lines between them are not examined for further opening lines.
+- Identifier: a text of one of these forms: `T-` followed by one or more ASCII digits (task); `FR-`, `EL-`, `ERR-`, or `AC-` followed by exactly three ASCII digits; `C` followed by one or more ASCII digits (component); `AR-` followed by one or more ASCII digits (architectural rule).
+- Defining document: TASKS.md for T identifiers; PRODUCT_SPEC.md for FR, EL, ERR, and AC identifiers; ARCHITECTURE.md for C and AR identifiers.
+- Definition line: a line outside any fenced code block in the defining document that is, for a T identifier, a task entry whose task ID equals the identifier; for an FR, EL, ERR, AC, or AR identifier, a line that starts with `- <identifier>: `; for a C identifier, a line that starts with `### <identifier>. `.
+- Definition excerpt: for a C identifier, the definition line and every following line up to, but not including, the next line outside a fenced code block that starts with one to three `#` characters followed by a space, or the end of the text, without trailing empty lines; for any other identifier, the definition line and every immediately following line that starts with a space or a tab. When an identifier has more than one definition line, the first one is used. The excerpt keeps each line's text exactly.
+- Reference: an occurrence of an identifier outside any fenced code block, with no ASCII letter, digit, or `-` immediately before or after it. The text `<A> through <B>`, where A and B are identifiers of the same form and the number of A is lower than the number of B, also references every identifier of that form whose number lies between them and that has a definition line.
+- Next task: the first incomplete task in TASKS.md order.
 - Expected AGENTS.md: the canonical AGENTS.md content when AGENTS.md contains no preserved block. Otherwise the canonical AGENTS.md content, ending with a line break, followed by each preserved block in its AGENTS.md order, each preceded by one empty line and followed by a line break.
 
 ## Outputs
@@ -136,6 +145,16 @@
   - Input: none.
   - Output: one JSON object whose fields are defined in User Interface / JSON Output; the encoding contains no ANSI escape sequences; the object occupies one line. The option has no effect on assistance output (usage help, completion, version information) or on ERR-005 handling.
   - Exit: the same code the command would exit with text lines.
+- EL-008: repl next
+  - Purpose: show the next task and the definitions of the identifiers it references.
+  - Input: none.
+  - Output: the definition excerpt of the next task, or an indication that no incomplete task exists; then the definition excerpt of each identifier referenced in the next task's excerpt, other than the next task itself; then one line per referenced identifier that has no definition line; one line per execution error.
+  - Exit: 0 on completion, 2 on execution error.
+- EL-009: repl show <identifier>...
+  - Purpose: show the definitions of the given identifiers.
+  - Input: one or more identifiers.
+  - Output: the definition excerpt of each given identifier, in the given order; one line per given identifier that has no definition line; one line per execution error.
+  - Exit: 0 when every identifier has a definition line and no execution error exists, 1 when at least one identifier has no definition line and no execution error exists, 2 when at least one execution error exists.
 
 ### JSON Output
 
@@ -155,6 +174,9 @@ Objects per command:
 - repl init: `{"items": [{"path": <string>, "state": "created" | "skipped" | "replaced" | "deleted"}, ...], "errors": [<string>, ...]}` — items are in the processing order defined in ARCHITECTURE.md.
 - repl sync: `{"up_to_date": <boolean>, "diff": [{"kind": "added" | "removed", "line": <string>}, ...], "script": {"path": <string>, "state": "created" | "replaced"} | null, "errors": [<string>, ...]}` — `script` is null when the script step was not reached or its outcome is unknown; diff entries are in the same order as the human difference output.
 - repl skills sync: `{"items": [{"name": <string>, "path": <string>, "state": "created" | "replaced" | "up to date"}, ...], "errors": [<string>, ...]}` — items are in the fixed skill order.
+- repl next: `{"task": <definition> | null, "definitions": [<definition>, ...], "missing": [<string>, ...], "errors": [<string>, ...]}` — `task` is null when no incomplete task exists or TASKS.md cannot be read; definitions and missing identifiers are in the order of their first reference in the task excerpt.
+- repl show: `{"definitions": [<definition>, ...], "missing": [<string>, ...], "errors": [<string>, ...]}` — definitions and missing identifiers are in the given order.
+- `<definition>`: `{"id": <string>, "path": <string>, "line": <integer>, "text": <string>}` — `path` is the defining document relative to the project directory, `line` is the 1-based number of the definition line, and `text` is the definition excerpt with lines joined by a line feed and no trailing line break.
 
 ### Rule Identifiers
 
@@ -234,10 +256,28 @@ Objects per command:
 - FR-051: repl skills sync MUST NOT access any network resource other than the five skill URLs.
 - FR-052: repl skills sync MUST NOT write any file other than the five skill files and their parent directories.
 
+### next
+
+- FR-064: repl next MUST print the definition excerpt of the next task.
+- FR-065: repl next MUST print an indication that no incomplete task exists when every task is complete or TASKS.md contains no task.
+- FR-066: repl next MUST print, after the task excerpt, the definition excerpt of each distinct identifier referenced in the next task's excerpt, except the next task's own identifier, in the order of first reference.
+- FR-067: repl next MUST print one line per distinct referenced identifier that has no definition line, containing that identifier. Such an identifier MUST NOT change the exit code.
+- FR-068: When a defining document is absent, repl next MUST treat every identifier it defines as having no definition line. When a defining document other than TASKS.md cannot be read, repl next MUST report one execution error for that document and MUST NOT report its identifiers as having no definition line.
+- FR-069: repl next MUST NOT modify any file.
+
+### show
+
+- FR-070: repl show MUST print the definition excerpt of each given identifier, in the given order. An identifier given more than once MUST be printed once, at its first position.
+- FR-071: repl show MUST print one line per given identifier that has no definition line, containing that identifier.
+- FR-072: When a defining document is absent, repl show MUST treat every identifier it defines as having no definition line. When a defining document cannot be read, repl show MUST report one execution error for that document and MUST NOT report its identifiers as having no definition line.
+- FR-073: repl show MUST read only the defining documents of the given identifiers.
+- FR-074: repl show MUST exit with code 0 when every given identifier has a definition line and no execution error exists, 1 when at least one given identifier has no definition line and no execution error exists, and 2 when at least one execution error exists.
+- FR-075: repl show MUST NOT modify any file.
+
 ### all commands
 
 - FR-032: Every command MUST operate only on the project directory.
-- FR-033: repl-cli MUST NOT access any network resource other than the canonical AGENTS.md document, the helper script, and the five skill URLs. Each command MUST request only the addresses its function requires: init and sync request the canonical AGENTS.md document and the helper script URL; check requests only the canonical AGENTS.md document; skills sync requests only the five skill URLs; status requests none.
+- FR-033: repl-cli MUST NOT access any network resource other than the canonical AGENTS.md document, the helper script, and the five skill URLs. Each command MUST request only the addresses its function requires: init and sync request the canonical AGENTS.md document and the helper script URL; check requests only the canonical AGENTS.md document; skills sync requests only the five skill URLs; status, next, and show request none.
 - FR-034: Only repl init, repl sync, and repl skills sync MUST write files.
 - FR-053: Every command other than repl skills sync MUST NOT create, modify, or delete anything under `.claude/`.
 - FR-054: repl skills sync MUST NOT create, modify, or delete anything under `.claude/` other than the five skill files and their parent directories.
@@ -248,6 +288,8 @@ Objects per command:
 - FR-061: When repl sync is given --json, it MUST print {"up_to_date": bool, "diff": [{"kind": "added" | "removed", "line": ...}, ...], "script": {"path": ..., "state": "created" | "replaced"} | null, "errors": [...]}; diff entries in the same order as the human difference output.
 - FR-062: When repl skills sync is given --json, it MUST print {"items": [{"name": ..., "path": ..., "state": "created" | "replaced" | "up to date"}, ...], "errors": [...]}; items in the fixed skill order.
 - FR-063: The option --json MUST NOT change the exit code of any command, and MUST NOT change assistance output or ERR-005 handling.
+- FR-076: When repl next is given --json, it MUST print {"task": <definition> | null, "definitions": [...], "missing": [...], "errors": [...]} as defined in User Interface / JSON Output.
+- FR-077: When repl show is given --json, it MUST print {"definitions": [...], "missing": [...], "errors": [...]} as defined in User Interface / JSON Output.
 
 ## User Flows
 
@@ -256,6 +298,7 @@ Objects per command:
 - Flow 3: the user runs repl check in a continuous integration job -> the job fails when the exit code is not 0.
 - Flow 4: the user runs repl sync -> the user reads the difference -> AGENTS.md equals the expected AGENTS.md and the helper script matches its published source.
 - Flow 5: the user runs repl skills sync -> the user reads one line per skill -> the five skill files exist under .claude/skills/ and match their published sources.
+- Flow 6: an agent runs repl next --json -> the agent reads the next task and the definitions it references -> the agent runs repl show for any further identifier it needs.
 
 ## Error Conditions
 
@@ -300,6 +343,14 @@ Objects per command:
   - repl skills sync MUST report the skills that were installed before the failure.
   - repl skills sync MUST print an error line.
   - repl skills sync MUST exit with code 2.
+- ERR-011: TASKS.md does not exist in the working tree, or cannot be read, when repl next runs.
+  - repl next MUST print an error line.
+  - repl next MUST NOT read any other document.
+  - repl next MUST exit with code 2.
+- ERR-012: repl show is given no argument, or an argument that is not an identifier.
+  - repl show MUST NOT read any file.
+  - repl show MUST print an error line naming each argument that is not an identifier, or stating that an identifier is required.
+  - repl show MUST exit with code 2.
 
 ## Non-Goals
 
@@ -382,3 +433,17 @@ Objects per command:
 - AC-070: Given any command, when it is given --json, then the output contains no ANSI escape sequences. (EL-007, FR-057, FR-035)
 - AC-071: Given --json, when repl help or repl version runs, then the output is the same as without --json. (EL-007, FR-063)
 - AC-072: Given an AGENTS.md that differs from the expected AGENTS.md, when repl sync --json runs, then stdout parses as {"up_to_date": false, "diff": [...], "script": {"path": ".replworks/scripts/ask-human.sh", "state": "created" | "replaced"}} and the exit code is 0. (EL-007, FR-061, EL-005)
+- AC-073: Given a TASKS.md whose first incomplete task T-002 has a two-line excerpt that references FR-001 and C3, a PRODUCT_SPEC.md that defines FR-001, and an ARCHITECTURE.md that has a `### C3. ` section, when repl next runs, then the output contains both lines of the T-002 excerpt, the FR-001 excerpt, and the C3 section, in that order, and the exit code is 0. (FR-064, FR-066, EL-008)
+- AC-074: Given a TASKS.md in which every task is complete, when repl next runs, then the output contains an indication that no incomplete task exists and the exit code is 0. (FR-065, EL-008)
+- AC-075: Given a next task that references AC-999 and a PRODUCT_SPEC.md that defines no AC-999, when repl next runs, then one line contains AC-999 and the exit code is 0. (FR-067, EL-008)
+- AC-076: Given a next task whose excerpt contains `AC-010 through AC-012` and a PRODUCT_SPEC.md that defines AC-010, AC-011, and AC-012, when repl next runs, then the output contains the excerpts of all three. (FR-066, EL-008)
+- AC-077: Given a next task whose excerpt references FR-001 only inside a fenced code block, when repl next runs, then the output does not contain the FR-001 excerpt. (FR-066, EL-008)
+- AC-078: Given a project directory without TASKS.md, when repl next runs, then an error line is printed and the exit code is 2. (ERR-011, EL-008)
+- AC-079: Given an unreadable ARCHITECTURE.md and a next task that references C3, when repl next runs, then one execution error line is printed, no line reports C3 as having no definition, and the exit code is 2. (FR-068, EL-008)
+- AC-080: Given a PRODUCT_SPEC.md that defines FR-002 with two indented continuation lines, when repl show FR-002 runs, then the output contains the definition line and both continuation lines, does not contain the following unindented line, and the exit code is 0. (FR-070, EL-009)
+- AC-081: Given an ARCHITECTURE.md that defines AR-03 and has a `### C2. ` section followed by a `### C3. ` section, when repl show C2 AR-03 runs, then the output contains the C2 section without the C3 heading, then the AR-03 excerpt, and the exit code is 0. (FR-070, EL-009)
+- AC-082: Given a PRODUCT_SPEC.md that defines no FR-999, when repl show FR-001 FR-999 runs, then the output contains the FR-001 excerpt and one line containing FR-999, and the exit code is 1. (FR-071, FR-074, EL-009)
+- AC-083: Given no argument, or the argument foo, when repl show runs, then no file is read, an error line is printed, and the exit code is 2. (ERR-012, EL-009)
+- AC-084: Given a next task that references FR-001 and C3, when repl next --json runs, then stdout parses as {"task": {"id": "T-…", "path": ".replworks/TASKS.md", "line": …, "text": …}, "definitions": [{"id": "FR-001", …}, {"id": "C3", …}], "missing": [], "errors": []} and the exit code is 0. (EL-007, FR-076, EL-008)
+- AC-085: Given a PRODUCT_SPEC.md that defines no FR-999, when repl show FR-999 --json runs, then stdout parses as {"definitions": [], "missing": ["FR-999"], "errors": []} and the exit code is 1. (EL-007, FR-077, EL-009)
+- AC-086: Given repl next or repl show, when it runs, then no file is created, modified, or deleted and no network request is sent. (FR-033, FR-069, FR-075)

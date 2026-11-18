@@ -354,3 +354,27 @@
     - Assistance output and ERR-005 handling are unchanged when --json is given.
     - Unit tests cover the JSON output of every command with the documented objects and exit-code parity with text mode.
     - make check passes.
+
+- [ ] T-033 Show identifier definitions with repl show
+  - Satisfies: PRODUCT_SPEC.md § Inputs (Identifier, Defining document, Definition line, Definition excerpt); § User Interface / Commands (EL-009); § User Interface / JSON Output (repl show, `<definition>`); § Functional Requirements / show (FR-070 through FR-075); § Functional Requirements / all commands (FR-033, FR-077); § Error Conditions (ERR-012); § Acceptance Criteria (AC-080 through AC-083, AC-085, AC-086); ARCHITECTURE.md § Components (C1, C18, C19), § Data Flow (show), § Failure Boundaries
+  - External boundary: no
+  - Acceptance criteria:
+    - Unit tests for the Definition Locator cover every identifier form (T, FR, EL, ERR, AC, C, AR): the first definition line wins; an indented continuation ends at the first line that does not start with a space or tab; a C section ends before the next heading of level 1 to 3 and drops trailing empty lines; a definition line inside a fenced code block is not a definition; excerpt text is kept exactly.
+    - repl show prints the excerpts in given order, prints a repeated identifier once, and prints one line per missing identifier.
+    - repl show exits with 0 when all identifiers are found, 1 when at least one is missing, and 2 on an execution error; an unreadable defining document produces one error line and its identifiers are not reported missing.
+    - repl show with no argument or a non-identifier argument reads no file, prints an error line, and exits with 2.
+    - repl show reads only the defining documents of the given identifiers, writes no file, and sends no network request.
+    - repl show --json prints the documented object and exits with the same code as text mode.
+    - make check passes.
+
+- [ ] T-034 Show the next task and its referenced definitions with repl next
+  - Satisfies: PRODUCT_SPEC.md § Inputs (Reference, Next task); § User Interface / Commands (EL-008); § User Interface / JSON Output (repl next); § Functional Requirements / next (FR-064 through FR-069); § Functional Requirements / all commands (FR-033, FR-076); § Error Conditions (ERR-011); § Acceptance Criteria (AC-073 through AC-079, AC-084, AC-086); ARCHITECTURE.md § Components (C17, C19), § Data Flow (next), § Failure Boundaries
+  - External boundary: no
+  - Acceptance criteria:
+    - Unit tests for the Definition Locator reference extraction cover: distinct identifiers in first-reference order; no letter, digit, or `-` adjacent to an identifier; references inside fenced code blocks ignored; `<A> through <B>` expands to the defined identifiers between the endpoints; the next task's own identifier excluded.
+    - repl next prints the next task excerpt, then the referenced excerpts, then one line per missing identifier, and exits with 0.
+    - repl next prints a no-incomplete-task indication when every task is complete or TASKS.md has no task, and exits with 0.
+    - repl next without TASKS.md prints one error line, reads no other document, and exits with 2; an unreadable defining document produces one error line, its identifiers are not reported missing, and the exit code is 2.
+    - repl next writes no file and sends no network request.
+    - repl next --json prints the documented object and exits with the same code as text mode.
+    - make check passes.
