@@ -210,3 +210,31 @@ func directoryState(t *testing.T, dir string) string {
 
 	return strings.Join(entries, "\n")
 }
+
+func TestHelpIgnoresTheJSONOption(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	code, stdout, _ := runApp(t, "--json", "help")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
+	}
+	if !strings.Contains(stdout, "repl") {
+		t.Fatalf("stdout = %q, want the help output", stdout)
+	}
+}
+
+func TestUnknownCommandWithJSONPrintsTheTextErrorLine(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	code, _, stderr := runApp(t, "--json", "nosuchcmd")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if !strings.Contains(stderr, "repl: ") {
+		t.Fatalf("stderr = %q, want the repl error line", stderr)
+	}
+}

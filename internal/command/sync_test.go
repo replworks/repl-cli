@@ -2,6 +2,7 @@ package command
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -545,5 +546,120 @@ func TestSyncReplacesTheScriptEvenWhenAgentsIsUpToDate(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(dir, ".replworks/scripts/ask-human.sh"))
 	if err != nil || string(content) != "script\n" {
 		t.Fatalf("ask-human.sh = %q, err = %v, want published contents", content, err)
+	}
+}
+
+func newJSONCommand(t *testing.T) (*cobra.Command, *bytes.Buffer) {
+	t.Helper()
+
+	var buffer bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&buffer)
+	cmd.Flags().Bool("json", true, "print one JSON object")
+
+	return cmd, &buffer
+}
+
+func parseJSON(t *testing.T, text string) map[string]any {
+	t.Helper()
+
+	var value map[string]any
+	if err := json.Unmarshal([]byte(text), &value); err != nil {
+		t.Fatalf("output is not valid JSON: %v (output = %q)", err, text)
+	}
+
+	return value
+}
+
+func TestRenderSyncJSONUpToDate(t *testing.T) {
+	cmd, buffer := newJSONCommand(t)
+
+	code := renderSync(cmd, syncproject.Outcome{
+		UpToDate:    true,
+		ScriptPath:  ".replworks/scripts/ask-human.sh",
+		ScriptState: "replaced",
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (output = %q)", code, buffer.String())
+	}
+
+	value := parseJSON(t, buffer.String())
+	if value["up_to_date"] != true {
+		t.Fatalf("up_to_date = %v, want true", value["up_to_date"])
+	}
+	if diff, ok := value["diff"].([]any); !ok || len(diff) != 0 {
+		t.Fatalf("diff = %v, want empty array", value["diff"])
+	}
+	script, ok := value["script"].(map[string]any)
+	if !ok {
+		t.Fatalf("script = %v, want an object", value["script"])
+	}
+	if script["path"] != ".replworks/scripts/ask-human.sh" || script["state"] != "replaced" {
+		t.Fatalf("script = %v, want the helper script", script)
+	}
+	if errors, ok := value["errors"].([]any); !ok || len(errors) != 0 {
+		t.Fatalf("errors = %v, want empty array", value["errors"])
+	}
+}
+
+func TestRenderSyncJSONWithDifference(t *testing.T) {
+	cmd, buffer := newJSONCommand(t)
+
+	code := renderSync(cmd, syncproject.Outcome{
+		Difference: []diff.Entry{
+			{Kind: diff.Removed, Line: "old"},
+			{Kind: diff.Added, Line: "new"},
+		},
+		ScriptPath:  ".replworks/scripts/ask-human.sh",
+		ScriptState: "created",
+	})
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (output = %q)", code, buffer.String())
+	}
+
+	value := parseJSON(t, buffer.String())
+	if value["up_to_date"] != false {
+		t.Fatalf("up_to_date = %v, want false", value["up_to_date"])
+	}
+	entries, ok := value["diff"].([]any)
+	if !ok || len(entries) != 2 {
+		t.Fatalf("diff = %v, want two entries", value["diff"])
+	}
+	removed, ok := entries[0].(map[string]any)
+	if !ok || removed["kind"] != "removed" || removed["line"] != "old" {
+		t.Fatalf("diff[0] = %v, want the removed line", entries[0])
+	}
+	added, ok := entries[1].(map[string]any)
+	if !ok || added["kind"] != "added" || added["line"] != "new" {
+		t.Fatalf("diff[1] = %v, want the added line", entries[1])
+	}
+	if script, ok := value["script"].(map[string]any); !ok || script["state"] != "created" {
+		t.Fatalf("script = %v, want state created", value["script"])
+	}
+}
+
+func TestRenderSyncJSONWithErrors(t *testing.T) {
+	cmd, buffer := newJSONCommand(t)
+
+	code := renderSync(cmd, syncproject.Outcome{
+		Errors: []error{errors.New("boom")},
+	})
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (output = %q)", code, buffer.String())
+	}
+
+	value := parseJSON(t, buffer.String())
+	if value["script"] != nil {
+		t.Fatalf("script = %v, want null", value["script"])
+	}
+	errors, ok := value["errors"].([]any)
+	if !ok || len(errors) != 1 {
+		t.Fatalf("errors = %v, want one error", value["errors"])
+	}
+	if errors[0] != "boom" {
+		t.Fatalf("errors[0] = %v, want boom", errors[0])
 	}
 }

@@ -342,3 +342,15 @@
     - A project whose documents satisfy both rules and whose TASKS.md references only defined identifiers produces no duplicate-definition or unresolved-reference violations.
     - repl check exits with code 1 when at least one of the new rules reports a violation and no execution error exists.
     - make check passes.
+
+- [x] T-032 Add JSON output to every command
+  - Satisfies: PRODUCT_SPEC.md § User Interface / Commands (EL-007); § User Interface / JSON Output; § Functional Requirements / all commands (FR-057 through FR-063); § Acceptance Criteria (AC-065 through AC-072); ARCHITECTURE.md § Components (C1), § Non-Goals, § Output line content
+  - External boundary: no
+  - Acceptance criteria:
+    - Every command supports --json; the object is one compact line and contains no ANSI escape sequences.
+    - repl status --json prints complete, total, first_incomplete (null when none) and exits with the same code as text mode.
+    - repl check --json prints violations in the fixed rule order and errors in gathering order, and exits with the same code as text mode.
+    - repl init --json, repl sync --json, repl skills sync --json print their documented objects and exit with the same code as text mode.
+    - Assistance output and ERR-005 handling are unchanged when --json is given.
+    - Unit tests cover the JSON output of every command with the documented objects and exit-code parity with text mode.
+    - make check passes.

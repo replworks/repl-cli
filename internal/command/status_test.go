@@ -156,3 +156,62 @@ func TestStatusReportsErrorWhenTasksCannotBeRead(t *testing.T) {
 		t.Fatalf("project directory changed:\nbefore: %s\nafter:  %s", before, after)
 	}
 }
+
+func TestStatusJSONReportsProgress(t *testing.T) {
+	dir := t.TempDir()
+	writeTasksFile(t, dir, "- [x] T-001 one\n- [ ] T-002 two\n- [ ] T-003 three\n")
+	t.Chdir(dir)
+
+	code, stdout, stderr := runApp(t, "--json", "status")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
+	}
+
+	value := parseJSON(t, stdout)
+	if value["complete"] != float64(1) {
+		t.Fatalf("complete = %v, want 1", value["complete"])
+	}
+	if value["total"] != float64(3) {
+		t.Fatalf("total = %v, want 3", value["total"])
+	}
+	if value["first_incomplete"] != "T-002" {
+		t.Fatalf("first_incomplete = %v, want T-002", value["first_incomplete"])
+	}
+	if errors, ok := value["errors"].([]any); !ok || len(errors) != 0 {
+		t.Fatalf("errors = %v, want empty array", value["errors"])
+	}
+}
+
+func TestStatusJSONReportsAllComplete(t *testing.T) {
+	dir := t.TempDir()
+	writeTasksFile(t, dir, "- [x] T-001 one\n- [X] T-002 two\n")
+	t.Chdir(dir)
+
+	code, stdout, stderr := runApp(t, "--json", "status")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr = %q)", code, stderr)
+	}
+
+	value := parseJSON(t, stdout)
+	if value["first_incomplete"] != nil {
+		t.Fatalf("first_incomplete = %v, want null", value["first_incomplete"])
+	}
+}
+
+func TestStatusJSONExitsTwoWithoutTasks(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	code, stdout, stderr := runApp(t, "--json", "status")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stderr = %q)", code, stderr)
+	}
+
+	value := parseJSON(t, stdout)
+	if errors, ok := value["errors"].([]any); !ok || len(errors) != 1 {
+		t.Fatalf("errors = %v, want one error", value["errors"])
+	}
+}
