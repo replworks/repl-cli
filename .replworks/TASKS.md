@@ -367,7 +367,7 @@
     - repl show --json prints the documented object and exits with the same code as text mode.
     - make check passes.
 
-- [ ] T-034 Show the next task and its referenced definitions with repl next
+- [x] T-034 Show the next task and its referenced definitions with repl next
   - Satisfies: PRODUCT_SPEC.md § Inputs (Reference, Next task); § User Interface / Commands (EL-008); § User Interface / JSON Output (repl next); § Functional Requirements / next (FR-064 through FR-069); § Functional Requirements / all commands (FR-033, FR-076); § Error Conditions (ERR-011); § Acceptance Criteria (AC-073 through AC-079, AC-084, AC-086); ARCHITECTURE.md § Components (C17, C19), § Data Flow (next), § Failure Boundaries
   - External boundary: no
   - Acceptance criteria:
