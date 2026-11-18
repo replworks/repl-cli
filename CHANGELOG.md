@@ -1,5 +1,15 @@
 # Release Notes
 
+## v0.7.0 - 2026-11-18
+
+### What's Changed
+
+* feat(check): add duplicate-definition and unresolved-reference rules by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/47
+* chore: add Agent Skills to the project by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/48
+* feat(cli): add --json output to every command by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/49
+
+**Full Changelog**: https://github.com/replworks/repl-cli/compare/v0.6.0...v0.7.0
+
 ## v0.5.0 - 2026-11-04
 
 ### What's Changed
