@@ -21,6 +21,7 @@
 - **Task Ledger**: the ordered list of task entries parsed from one TASKS.md text.
 - **Task Entry**: a task ID plus a completion state, as recognized by the Task Ledger Reader.
 - **Preserved Block** and **Expected Text**: the preserved block and expected AGENTS.md defined in PRODUCT_SPEC.md.
+- **Definition Excerpt** and **Reference**: the definition excerpt and reference defined in PRODUCT_SPEC.md.
 - **Mark**: one occurrence of the UNVERIFIED text within a heading line of an authoritative document.
 - **Fact**: a piece of information obtained from outside a pure component. Every fact has exactly one state:
   - `Present(value)`
@@ -54,10 +55,13 @@ Command Interface
  │                       Unverified Mark Scanner, Rule Evaluator
  ├─ Sync Coordinator   → Project Workspace (Read+Write), Canonical Document Provider,
  │                       Preserved Block Reader, Difference Calculator
- └─ Skills Sync Coordinator → Project Workspace (Read+Write), Skill Provider
+ ├─ Skills Sync Coordinator → Project Workspace (Read+Write), Skill Provider
+ ├─ Next Coordinator   → Project Workspace (Read), Task Ledger Reader, Definition Locator
+ └─ Show Coordinator   → Project Workspace (Read), Definition Locator
 
 Rule Evaluator → Preserved Block Reader
-Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Document Line Classifier
+Definition Locator → Task Ledger Reader (Task Entry grammar for T definition lines)
+Task Ledger Reader, Unverified Mark Scanner, Preserved Block Reader, and Definition Locator → Document Line Classifier
 ```
 
 - Dependencies point only downward in this map.
@@ -70,6 +74,7 @@ Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Docu
 - Responsibilities:
   - Recognize the command and its options.
   - Reject an unknown command or option before any coordinator runs.
+  - Validate the arguments of show against the identifier forms owned by the Definition Locator, reject no argument or a non-identifier argument before any coordinator runs, and pass the distinct identifiers in given order.
   - Resolve the base branch name for check (the given value, otherwise the default defined in PRODUCT_SPEC.md).
   - Use the single canonical AGENTS.md source for init and sync without reading stdin.
   - Produce assistance output (usage help and similar) itself, without a coordinator.
@@ -347,6 +352,49 @@ Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Docu
   - Does not perform I/O itself, print, or compare content beyond exact equality.
   - Holds the Workspace `Write` capability, restricted to `.claude/skills/` paths and their parent directories.
 
+### C17. Next Coordinator
+
+- Responsibilities:
+  - Read the TASKS.md fact. Record an execution error and stop when it is `Absent` or `Failed`; read no other document.
+  - Ask the Task Ledger Reader for the first incomplete task ID. When there is none, return an Outcome with no task.
+  - Ask the Definition Locator for the next task's Definition Excerpt and for the References in that excerpt, excluding the task's own identifier.
+  - Read each defining document needed by those References at most once, in the order PRODUCT_SPEC.md, ARCHITECTURE.md, TASKS.md (already read).
+  - For each Reference in first-reference order: when its defining document is `Present`, ask the Definition Locator for its excerpt and record it as found or missing; when `Absent`, record it as missing; when `Failed`, record neither.
+  - Record each `Failed` document as one execution error, in reading order.
+- Inputs: Request (no options), TASKS.md fact, defining document facts.
+- Outputs: Outcome with the task excerpt or none, ordered found excerpts, ordered missing identifiers, and execution errors.
+- Ownership boundaries:
+  - Owns the selection and order of facts for next.
+  - Holds only the Workspace `Read` capability.
+  - Does not recognize identifiers or excerpts itself, write, or print.
+
+### C18. Show Coordinator
+
+- Responsibilities:
+  - Receive the given identifiers, already validated and de-duplicated by the Command Interface in given order.
+  - Read only the defining documents of the given identifiers, each at most once, in the order PRODUCT_SPEC.md, ARCHITECTURE.md, TASKS.md.
+  - For each identifier in given order: when its defining document is `Present`, ask the Definition Locator for its excerpt and record it as found or missing; when `Absent`, record it as missing; when `Failed`, record neither.
+  - Record each `Failed` document as one execution error, in reading order.
+- Inputs: Request with ordered identifiers, defining document facts.
+- Outputs: Outcome with ordered found excerpts, ordered missing identifiers, and execution errors.
+- Ownership boundaries:
+  - Owns the selection and order of facts for show.
+  - Holds only the Workspace `Read` capability.
+  - Does not recognize identifiers or excerpts itself, write, or print.
+
+### C19. Definition Locator
+
+- Responsibilities:
+  - Own the identifier forms, the defining document of each form, the definition line forms, the Definition Excerpt boundaries, and the Reference grammar, including `<A> through <B>` ranges, all as defined in PRODUCT_SPEC.md.
+  - Recognize T definition lines through the Task Entry grammar of the Task Ledger Reader.
+  - Given a defining document text and an identifier, return the excerpt of the first definition line with its line number, or not found.
+  - Given an excerpt text and the texts of the defining documents that are `Present`, return the distinct References in first-reference order. A range expands, at its position, to the defined identifiers between its endpoints in ascending number order.
+- Inputs: identifier, document texts, excerpt text.
+- Outputs: `(identifier, line number, excerpt lines) | not found`; ordered distinct identifiers.
+- Ownership boundaries:
+  - Owns definition lookup and reference extraction for next and show.
+  - Does not decide what is a violation (that is the Rule Evaluator), does no I/O. Is pure.
+
 ## 5. Component Responsibilities (summary)
 
 | Responsibility                              | Sole owner                                              |
@@ -365,6 +413,7 @@ Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Docu
 | Heading and Mark definitions                | Unverified Mark Scanner                                 |
 | Rule identifiers, order, logic, messages    | Rule Evaluator                                          |
 | Line-level difference                       | Difference Calculator                                   |
+| Definition lookup and reference extraction  | Definition Locator                                      |
 | Execution error aggregation                 | Each Coordinator (per invocation)                       |
 
 ## 6. Responsibility Boundaries
@@ -374,10 +423,10 @@ Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Docu
 - Only the Project Workspace touches the file system.
 - Only the Canonical Document Provider and the Skill Provider touch the network.
 - Only the Base Branch Reader touches the repository.
-- Pure components (Document Line Classifier, Task Ledger Reader, Unverified Mark Scanner, Rule Evaluator, Difference Calculator) never perform I/O and never read time, environment, or global state.
+- Pure components (Document Line Classifier, Task Ledger Reader, Unverified Mark Scanner, Rule Evaluator, Difference Calculator, Preserved Block Reader, Definition Locator) never perform I/O and never read time, environment, or global state.
 - The Rule Evaluator decides what is a violation. Coordinators decide what is an execution error. Neither does the other's job.
 - The Command Interface never inspects facts; it only renders Outcomes.
-- Status and Check Coordinators never receive the Workspace `Write` capability.
+- Status, Check, Next, and Show Coordinators never receive the Workspace `Write` capability.
 - No component outside the Canonical Document Provider knows the source representation of the Canonical Text.
 
 ## 7. Data Flow
@@ -449,9 +498,34 @@ Request → Skills Sync Coordinator
   → Outcome(per-skill states, errors) → Command Interface → lines + status
 ```
 
+### next
+
+```text
+Request → Next Coordinator
+  Workspace Read(TASKS.md) → fact
+  [Absent | Failed] → Outcome(error)
+  [Present] → Task Ledger Reader → first incomplete task ID
+    [none] → Outcome(no task)
+    Definition Locator → task excerpt → References
+    Workspace Read × needed defining documents → facts
+    Definition Locator × References → found excerpts | missing
+  → Outcome(task, definitions, missing, errors) → Command Interface
+```
+
+### show
+
+```text
+Request(identifiers) → Show Coordinator
+  Workspace Read × defining documents of the identifiers → facts
+  Definition Locator × identifiers → found excerpts | missing
+  → Outcome(definitions, missing, errors) → Command Interface
+```
+
 ### Exit status mapping (owned by Command Interface)
 
-- init, status, sync, skills sync: 2 when the Outcome has at least one execution error, otherwise 0.
+- show: 2 when at least one execution error exists, otherwise 1 when at least one identifier is missing, otherwise 0.
+- show with no argument or an argument that is not an identifier: one error line and 2, without running the Show Coordinator.
+- init, status, next, sync, skills sync: 2 when the Outcome has at least one execution error, otherwise 0.
 - check: 2 when at least one execution error exists, otherwise 1 when at least one violation exists, otherwise 0.
 - Unknown command or option: one error line and 2.
 
@@ -462,6 +536,8 @@ Request → Skills Sync Coordinator
 - check: violation lines first (Rule Evaluator order), then execution error lines (gathering order). A violation line contains rule identifier, file path, message. An error line contains the subject and message.
 - sync: an up-to-date indication, or the difference lines, helper-script state line when changed, followed by any error line.
 - sync difference lines: removed lines are red and added lines are green for terminal output; non-terminal output is plain.
+- next: the task excerpt lines or a no-incomplete-task indication, then each found excerpt, then one line per missing identifier, then any error lines. Each excerpt is preceded by one line containing its identifier, path, and line number.
+- show: each found excerpt in given order, each preceded by one line containing its identifier, path, and line number, then one line per missing identifier, then any error lines.
 - skills sync: one line per skill containing the skill name, the path, and created, replaced, or up to date; then any error lines.
 - When `--json` is given, the Command Interface renders the Outcome as one compact JSON object following the schema in User Interface / JSON Output in PRODUCT_SPEC.md instead of the lines above; the exit status mapping is unchanged.
 - All paths printed are relative to the Project Directory.
@@ -498,6 +574,9 @@ Request → Skills Sync Coordinator
 | Replacement fails (sync)                                      | Project Workspace                           | Sync Coordinator   | Execution error. The difference is still reported                                                                       |
 | AGENTS.md block opening line without closing line (sync)     | Preserved Block Reader                      | Sync Coordinator   | Execution error with the line number, no write                                                                          |
 | AGENTS.md block opening line without closing line (check)    | Preserved Block Reader                      | Rule Evaluator     | agents-canonical violation with the line number                                                                         |
+| TASKS.md absent or unreadable (next)                          | Project Workspace                           | Next Coordinator   | Execution error. No other document is read                                                                              |
+| A defining document absent (next, show)                       | Project Workspace                           | Next or Show Coordinator | Not an error. Its identifiers are missing                                                                         |
+| A defining document unreadable (next, show)                   | Project Workspace                           | Next or Show Coordinator | Execution error. Its identifiers are neither found nor missing                                                    |
 | Malformed task or heading lines                               | Task Ledger Reader, Unverified Mark Scanner | Same components    | Ignored. Parsing never fails                                                                                            |
 | A skill file cannot be obtained                               | Skill Provider                              | Skills Sync Coordinator | No write; one error line per failed skill; exit 2                                                                |
 | A local skill file cannot be read                             | Project Workspace                           | Skills Sync Coordinator | Stop; skills installed before the failure are reported; one error line; exit 2                                   |
@@ -510,7 +589,8 @@ Request → Skills Sync Coordinator
 ## 10. Non-Goals
 
 - No rule registry, plug-in mechanism, or user-defined rules.
-- No interpretation of document content beyond: presence, exact text, Task Entries, heading Marks, and AGENTS.md Preserved Blocks.
+- No interpretation of document content beyond: presence, exact text, Task Entries, heading Marks, AGENTS.md Preserved Blocks, identifier definitions, and References.
+- No lookup of sections that have no identifier, and no transitive expansion of References found inside referenced excerpts.
 - No caching of the Canonical Text, and no fallback source for it, across invocations.
 - No rollback or transaction across multiple writes.
 - No automatic repair of rule violations by check.
