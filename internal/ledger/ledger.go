@@ -55,6 +55,12 @@ func (l *Ledger) addID(id string) {
 	l.IDs = append(l.IDs, id)
 }
 
+// ParseEntry reports the task ID and completion state of a classified line
+// when it is a Task Entry.
+func ParseEntry(line docline.Line) (id string, complete bool, ok bool) {
+	return parseEntry(line)
+}
+
 func parseEntry(line docline.Line) (string, bool, bool) {
 	if line.InsideFence {
 		return "", false, false

@@ -355,7 +355,7 @@
     - Unit tests cover the JSON output of every command with the documented objects and exit-code parity with text mode.
     - make check passes.
 
-- [ ] T-033 Show identifier definitions with repl show
+- [x] T-033 Show identifier definitions with repl show
   - Satisfies: PRODUCT_SPEC.md § Inputs (Identifier, Defining document, Definition line, Definition excerpt); § User Interface / Commands (EL-009); § User Interface / JSON Output (repl show, `<definition>`); § Functional Requirements / show (FR-070 through FR-075); § Functional Requirements / all commands (FR-033, FR-077); § Error Conditions (ERR-012); § Acceptance Criteria (AC-080 through AC-083, AC-085, AC-086); ARCHITECTURE.md § Components (C1, C18, C19), § Data Flow (show), § Failure Boundaries
   - External boundary: no
   - Acceptance criteria:
