@@ -1,5 +1,15 @@
 # Release Notes
 
+## v0.8.0 - 2026-11-18
+
+### What's Changed
+
+* docs: specify repl next and repl show for scoped document reading by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/50
+* feat(show): add repl show to print identifier definitions by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/51
+* feat(next): add repl next to print the next task and its references by [@replworks-bot](https://github.com/replworks-bot) in https://github.com/replworks/repl-cli/pull/52
+
+**Full Changelog**: https://github.com/replworks/repl-cli/compare/v0.7.0...v0.8.0
+
 ## v0.7.0 - 2026-11-18
 
 ### What's Changed
