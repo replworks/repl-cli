@@ -4,9 +4,12 @@ package rule
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/replworks/repl-cli/internal/agentblock"
+	"github.com/replworks/repl-cli/internal/docline"
 	"github.com/replworks/repl-cli/internal/fact"
 	"github.com/replworks/repl-cli/internal/ledger"
 	"github.com/replworks/repl-cli/internal/mark"
@@ -32,9 +35,19 @@ const RuleNoUnverified = "no-unverified"
 // expected AGENTS.md or contains an unclosed block opening line.
 const RuleAgentsCanonical = "agents-canonical"
 
+// RuleDuplicateDefinition is reported for each identifier defined more than
+// once in its defining document.
+const RuleDuplicateDefinition = "duplicate-definition"
+
+// RuleUnresolvedReference is reported for each identifier that appears in
+// TASKS.md without a definition in its defining document.
+const RuleUnresolvedReference = "unresolved-reference"
+
 const (
-	agentsPath = "AGENTS.md"
-	tasksPath  = ".replworks/TASKS.md"
+	agentsPath       = "AGENTS.md"
+	tasksPath        = ".replworks/TASKS.md"
+	productSpecPath  = ".replworks/PRODUCT_SPEC.md"
+	architecturePath = ".replworks/ARCHITECTURE.md"
 )
 
 // Violation is a failed rule.
@@ -64,6 +77,9 @@ type Facts struct {
 	WorkingLedger fact.Fact[ledger.Ledger]
 	BaseLedger    fact.Fact[ledger.Ledger]
 	MarkLists     []MarkList
+	ProductSpec   fact.Fact[string]
+	Architecture  fact.Fact[string]
+	TasksText     fact.Fact[string]
 }
 
 // Evaluator owns the rule identifiers, their evaluation order, and their
@@ -89,6 +105,8 @@ var order = []func(Facts) []Violation{
 	singleTaskCompletion,
 	noUnverified,
 	agentsCanonical,
+	duplicateDefinition,
+	unresolvedReference,
 }
 
 func documentsExist(facts Facts) []Violation {
@@ -230,4 +248,168 @@ func agentsCanonical(facts Facts) []Violation {
 		Path:    agentsPath,
 		Message: "AGENTS.md differs from the canonical AGENTS.md",
 	}}
+}
+
+var (
+	productSpecDefinition  = regexp.MustCompile(`^- ((?:FR|EL|ERR|AC)-[0-9]{3}): `)
+	architectureDefinition = regexp.MustCompile(`^### (C[0-9]+)\. `)
+	referencePattern       = regexp.MustCompile(`((?:FR|EL|ERR|AC)-[0-9]{3}|C[0-9]+)`)
+)
+
+func duplicateDefinition(facts Facts) []Violation {
+	var violations []Violation
+
+	for _, spec := range []struct {
+		path    string
+		pattern *regexp.Regexp
+		text    fact.Fact[string]
+	}{
+		{productSpecPath, productSpecDefinition, facts.ProductSpec},
+		{architecturePath, architectureDefinition, facts.Architecture},
+	} {
+		if !spec.text.IsPresent() {
+			continue
+		}
+
+		definitions := map[string][]int{}
+		for _, line := range docline.Classify(spec.text.Value()) {
+			if line.InsideFence {
+				continue
+			}
+			id, ok := matchDefinition(spec.pattern, line.Text)
+			if !ok {
+				continue
+			}
+			definitions[id] = append(definitions[id], line.Number)
+		}
+
+		ids := make([]string, 0, len(definitions))
+		for id := range definitions {
+			ids = append(ids, id)
+		}
+		slices.Sort(ids)
+
+		for _, id := range ids {
+			lines := definitions[id]
+			if len(lines) < 2 {
+				continue
+			}
+
+			violations = append(violations, Violation{
+				Rule:    RuleDuplicateDefinition,
+				Path:    spec.path,
+				Message: fmt.Sprintf("identifier %s is defined on lines %s", id, joinInts(lines)),
+			})
+		}
+	}
+
+	return violations
+}
+
+func matchDefinition(pattern *regexp.Regexp, line string) (string, bool) {
+	match := pattern.FindStringSubmatch(line)
+	if match == nil {
+		return "", false
+	}
+
+	return match[1], true
+}
+
+func joinInts(numbers []int) string {
+	parts := make([]string, len(numbers))
+	for i, number := range numbers {
+		parts[i] = fmt.Sprintf("%d", number)
+	}
+
+	return strings.Join(parts, ", ")
+}
+
+func isWordChar(char byte) bool {
+	switch {
+	case char >= 'A' && char <= 'Z':
+		return true
+	case char >= 'a' && char <= 'z':
+		return true
+	case char >= '0' && char <= '9':
+		return true
+	default:
+		return char == '_'
+	}
+}
+
+func unresolvedReference(facts Facts) []Violation {
+	if !facts.TasksText.IsPresent() {
+		return nil
+	}
+
+	defined := map[string]bool{}
+	if facts.ProductSpec.IsPresent() {
+		for _, line := range docline.Classify(facts.ProductSpec.Value()) {
+			if line.InsideFence {
+				continue
+			}
+			if id, ok := matchDefinition(productSpecDefinition, line.Text); ok {
+				defined[id] = true
+			}
+		}
+	}
+
+	architectureDefined := map[string]bool{}
+	if facts.Architecture.IsPresent() {
+		for _, line := range docline.Classify(facts.Architecture.Value()) {
+			if line.InsideFence {
+				continue
+			}
+			if id, ok := matchDefinition(architectureDefinition, line.Text); ok {
+				architectureDefined[id] = true
+			}
+		}
+	}
+
+	firstLine := map[string]int{}
+	var order []string
+	for _, line := range docline.Classify(facts.TasksText.Value()) {
+		if line.InsideFence {
+			continue
+		}
+		text := line.Text
+		for _, position := range referencePattern.FindAllStringIndex(text, -1) {
+			start, end := position[0], position[1]
+			if start > 0 && isWordChar(text[start-1]) {
+				continue
+			}
+			if end < len(text) && isWordChar(text[end]) {
+				continue
+			}
+
+			id := text[start:end]
+			if _, seen := firstLine[id]; seen {
+				continue
+			}
+			firstLine[id] = line.Number
+			order = append(order, id)
+		}
+	}
+
+	var violations []Violation
+	for _, id := range order {
+		switch {
+		case strings.HasPrefix(id, "C"):
+			if !facts.Architecture.IsPresent() || architectureDefined[id] {
+				continue
+			}
+		default:
+			if !facts.ProductSpec.IsPresent() || defined[id] {
+				continue
+			}
+		}
+
+		violations = append(violations, Violation{
+			Rule:    RuleUnresolvedReference,
+			Path:    tasksPath,
+			Message: fmt.Sprintf("identifier %s is referenced but never defined (first appearance on line %d)", id, firstLine[id]),
+		})
+	}
+
+	return violations
 }

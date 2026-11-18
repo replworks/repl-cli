@@ -22,7 +22,7 @@
 
 - The product MUST enable the user to create the AGENTS.md file and the .replworks/ directory in a project directory.
 - The product MUST enable the user to see how many tasks are complete.
-- The product MUST enable the user to detect violations of the rules in FR-013 through FR-017.
+- The product MUST enable the user to detect violations of the rules in FR-013 through FR-017, FR-055, and FR-056.
 - The product MUST enable the user to update AGENTS.md to the canonical AGENTS.md.
 
 ## Users
@@ -53,7 +53,7 @@
 - Newly complete task: a task whose completion state is complete in the working tree and is incomplete or absent in TASKS.md on the base branch.
 - Base branch: the git branch against which the working tree is compared. The default is main.
 - UNVERIFIED mark: the text [UNVERIFIED] within a heading line of .replworks/PRODUCT_SPEC.md, .replworks/TECH_STACK.md, or .replworks/ARCHITECTURE.md in the working tree.
-- Violation: a failed result of one rule in FR-013 through FR-017.
+- Violation: a failed result of one rule in FR-013 through FR-017, FR-055, and FR-056.
 - Fenced code block: a run of lines that opens with a line of three or more backticks or tildes and closes with a line of the same character in at least the same count. An unclosed fenced code block extends to the end of the text.
 - Block opening line: a line outside any fenced code block whose entire content is either `<name>` or `<!-- BEGIN:name -->`, with no indentation and no other text. In `<name>`, name starts with a letter and contains only letters, digits, `_`, and `-`. In `<!-- BEGIN:name -->`, name starts with a letter or digit and contains only letters, digits, `_`, `.`, and `-`. A line whose content also appears as a block opening line in the canonical AGENTS.md is not a block opening line.
 - Block closing line: a line outside any fenced code block whose entire content is `</name>` for an opening line `<name>`, or `<!-- END:name -->` for an opening line `<!-- BEGIN:name -->`, with the same name, no indentation, and no other text.
@@ -111,7 +111,7 @@
   - Output: the number of complete tasks, the total number of tasks, and the task ID of the first incomplete task in TASKS.md order or an indication that no incomplete task exists.
   - Exit: 0 on success, 2 on execution error.
 - EL-003: repl check
-  - Purpose: verify the project against the rules in FR-013 through FR-017.
+  - Purpose: verify the project against the rules in FR-013 through FR-017, FR-055, and FR-056.
   - Input: option EL-004.
   - Output: one line per violation, containing the rule identifier, the file path, and a message. One line per execution error.
   - Exit: 0 when no violation and no execution error exist, 1 when at least one violation exists and no execution error exists, 2 when at least one execution error exists.
@@ -138,6 +138,8 @@
 - single-task-completion
 - no-unverified
 - agents-canonical
+- duplicate-definition
+- unresolved-reference
 
 ## Functional Requirements
 
@@ -180,6 +182,8 @@
 - FR-024: repl check MUST exit with code 0 when no violation and no execution error exist.
 - FR-025: repl check MUST exit with code 1 when at least one violation exists and no execution error exists.
 - FR-026: repl check MUST exit with code 2 when at least one execution error exists, regardless of violations.
+- FR-055: repl check MUST report a violation of rule duplicate-definition for each identifier defined more than once in its defining document, namely each FR, EL, ERR, or AC identifier defined by two or more lines in PRODUCT_SPEC.md, and each C identifier defined by two or more lines in ARCHITECTURE.md. Each violation's message MUST contain the identifier and the line numbers of its definitions. repl check MUST NOT evaluate rule duplicate-definition for a document that is absent or unreadable in the working tree.
+- FR-056: repl check MUST report a violation of rule unresolved-reference for each identifier of the forms FR, EL, ERR, AC, or C that appears in TASKS.md and has no definition in its defining document, namely PRODUCT_SPEC.md for FR, EL, ERR, and AC identifiers, and ARCHITECTURE.md for C identifiers. Each violation's message MUST contain the identifier and the line number of its first appearance. repl check MUST NOT evaluate rule unresolved-reference when TASKS.md does not exist in the working tree. When PRODUCT_SPEC.md is absent or unreadable, repl check MUST NOT report violations for FR, EL, ERR, and AC identifiers. When ARCHITECTURE.md is absent or unreadable, repl check MUST NOT report violations for C identifiers.
 
 ### sync
 
@@ -331,3 +335,10 @@
 - AC-055: Given any command other than repl skills sync, when it runs, then no file under `.claude/` is created, modified, or deleted. (FR-053)
 - AC-056: Given repl skills sync, when it runs, then the only addresses requested are the five skill URLs. (FR-051)
 - AC-057: Given a mix of identical and differing skill files, when repl skills sync runs, then only the differing files are created or replaced and each skill is reported with its outcome. (FR-046, FR-048, FR-049)
+- AC-058: Given a PRODUCT_SPEC.md in which FR-001 is defined on two lines, when repl check runs, then one line reports rule duplicate-definition with the path, and the message contains FR-001 and both line numbers. (FR-055, FR-018, EL-003)
+- AC-059: Given a TASKS.md containing a reference to AC-999 where PRODUCT_SPEC.md defines no AC-999, when repl check runs, then one line reports rule unresolved-reference with the path, and the message contains AC-999 and the line number of its first appearance. (FR-056, FR-018, EL-003)
+- AC-060: Given a TASKS.md containing a reference to C99 where ARCHITECTURE.md has no C99 component, when repl check runs, then one line reports rule unresolved-reference with the path, and the message contains C99. (FR-056, FR-018, EL-003)
+- AC-061: Given a project whose documents define each identifier once and whose TASKS.md references only defined identifiers, when repl check runs, then no line reports rules duplicate-definition or unresolved-reference. (FR-055, FR-056, EL-003)
+- AC-062: Given an unreadable PRODUCT_SPEC.md, when repl check runs, then duplicate-definition and unresolved-reference do not report violations for that document, one execution error line is printed, and the exit code is 2. (FR-055, FR-056, FR-026, EL-003)
+- AC-063: Given no TASKS.md in the working tree, when repl check runs, then no line reports rule unresolved-reference. (FR-023, FR-056, EL-003)
+- AC-064: Given at least one duplicate-definition violation and no execution error, when repl check runs, then the exit code is 1. (FR-025, FR-055, EL-003)

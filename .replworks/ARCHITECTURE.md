@@ -235,12 +235,14 @@ Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Docu
 ### C12. Rule Evaluator
 
 - Responsibilities:
-  - Own the five rule identifiers and their fixed evaluation order:
+  - Own the seven rule identifiers and their fixed evaluation order:
     1. documents-exist
     2. task-ids-unchanged
     3. single-task-completion
     4. no-unverified
     5. agents-canonical
+    6. duplicate-definition
+    7. unresolved-reference
   - Evaluate each rule only when its preconditions hold; a rule whose preconditions do not hold produces no violation.
   - Own the violation message text. Required content is listed per rule below.
   - Derive newly complete tasks from the working ledger and the base ledger.
@@ -251,6 +253,7 @@ Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Docu
   - Working ledger fact (`Present | Absent | Failed`).
   - Base ledger fact (`Present | Absent | Failed`).
   - Mark lists for PRODUCT_SPEC.md, TECH_STACK.md, ARCHITECTURE.md (each `Present | Absent | Failed`).
+  - Texts of PRODUCT_SPEC.md, ARCHITECTURE.md, and TASKS.md (each `Present | Absent | Failed`).
 - Outputs: ordered list of Violations.
 - Ownership boundaries:
   - Owns rule logic, preconditions, violation ordering, and violation content.
@@ -274,6 +277,17 @@ Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Docu
     - Obtain the Expected Text from the Preserved Block Reader.
     - One violation when the reader reports an unclosed opening line; the message contains that line number. Path is AGENTS.md.
     - Otherwise one violation when the working AGENTS.md and the Expected Text are not exactly equal. Path is AGENTS.md.
+  - **duplicate-definition**
+    - Precondition: the defined document's text is `Present` (evaluated per document, PRODUCT_SPEC.md before ARCHITECTURE.md).
+    - A definition line of PRODUCT_SPEC.md matches `^- (FR|EL|ERR|AC)-[0-9]{3}: `; a definition line of ARCHITECTURE.md matches `^### C[0-9]+\. `; lines inside fenced code blocks are not definition lines.
+    - One violation per identifier defined on two or more lines, in document order, then line number. Path is the document. The message contains the identifier and the ascending line numbers of its definitions.
+    - An `Absent` document contributes zero violations. A `Failed` document contributes zero violations and records the failure as an execution error (recorded by the coordinator).
+  - **unresolved-reference**
+    - Precondition: working TASKS.md text is `Present`. TASKS.md is `Absent` produces no violations; TASKS.md is `Failed` produces no violations and records the failure as an execution error (recorded by the coordinator).
+    - A reference is an occurrence of `FR`, `EL`, `ERR`, `AC`, or `C` followed by one or more ASCII digits outside a fenced code block, with a non-identifier character before and after the digits. References are reported by their first appearance line, in TASKS.md line order.
+    - Each FR, EL, ERR, and AC reference requires a definition line `^- <id>: ` in PRODUCT_SPEC.md; each C reference requires a definition line `^### <id>. ` in ARCHITECTURE.md.
+    - Each reference without its definition produces one violation. Path is TASKS.md. The message contains the identifier and the line number of its first appearance.
+    - When PRODUCT_SPEC.md is `Absent` or `Failed`, FR, EL, ERR, and AC references are not evaluated; when ARCHITECTURE.md is `Absent` or `Failed`, C references are not evaluated. An `Absent` or `Failed` defining document records an execution error only when it is `Failed` (recorded by the coordinator).
 - Newly complete task definition:
   - An ID is complete in the base ledger when at least one base entry with that ID is complete.
   - A working entry is newly complete when it is complete and its ID is not complete in the base ledger.
@@ -397,6 +411,7 @@ Request(base branch) → Check Coordinator
   Base Branch Reader → base ledger source fact
   Task Ledger Reader × up to 2 (working text, base text) → ledgers
   Unverified Mark Scanner × up to 3 → Mark lists
+  Cross-reference facts: texts of PRODUCT_SPEC.md, ARCHITECTURE.md, TASKS.md (each Present | Absent | Failed)
   → Facts bundle → Rule Evaluator → Violations
   → Outcome(violations, errors) → Command Interface → lines + status
 ```
@@ -463,7 +478,7 @@ Request → Skills Sync Coordinator
 - AR-09: All comparisons of document text are exact. No normalization of line endings, whitespace, or case. AGENTS.md is compared with the Expected Text.
 - AR-10: Output lines are rendered only after a coordinator has returned its Outcome.
 - AR-11: Violation and error ordering is fixed by this document and never depends on completion timing.
-- AR-12: The Rule Evaluator's rule set and order are fixed; adding a rule is an architecture change.
+- AR-12: The Rule Evaluator's rule set and order are fixed: documents-exist, task-ids-unchanged, single-task-completion, no-unverified, agents-canonical, duplicate-definition, unresolved-reference; adding a rule is an architecture change.
 
 ## 9. Failure Boundaries
 

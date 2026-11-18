@@ -100,6 +100,9 @@ func (c Coordinator) Run(branch string) Outcome {
 			WorkingLedger: ledgerFact(texts[tasksPath]),
 			BaseLedger:    ledgerFact(base),
 			MarkLists:     markLists,
+			ProductSpec:   texts[productSpec],
+			Architecture:  texts[architecture],
+			TasksText:     texts[tasksPath],
 		}),
 		Errors: errors,
 	}

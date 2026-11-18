@@ -332,3 +332,13 @@
     - Every command requests only the addresses its function requires; repl skills sync requests only the five skill URLs.
     - Unit tests for Skill Provider and Skills Sync Coordinator, and command-level output tests, pass.
     - gofmt, go vet, golangci-lint, go test ./... pass.
+
+- [x] T-031 Extend repl check with cross-reference rules
+  - Satisfies: PRODUCT_SPEC.md § Rule Identifiers (duplicate-definition, unresolved-reference); § Functional Requirements / check (FR-055, FR-056, FR-023, FR-025, FR-026); § User Interface / Commands (EL-003); § Acceptance Criteria (AC-058 through AC-064, AC-031); ARCHITECTURE.md § Components (C4, C12), § Architectural Rules (AR-05, AR-08, AR-12)
+  - External boundary: no
+  - Acceptance criteria:
+    - Unit tests for the Rule Evaluator cover both new rules: a duplicate identifier defined twice in PRODUCT_SPEC.md (FR and AC forms) and in ARCHITECTURE.md (component form); a fenced definition line is not counted; each FR, EL, ERR, AC, and C reference in TASKS.md resolves or reports unresolved-reference with the identifier and its line number; a reference in a fenced code block is not reported; the first appearance is reported once; an Absent or Failed defining document produces no violation for its class of references; TASKS.md absent produces no unresolved-reference violation.
+    - Command-level tests show the check output contains one line per violation with the rule identifier, the file path, and a message that contains the identifier (and for duplicate-definition, both line numbers; for unresolved-reference, the line number of the first appearance).
+    - A project whose documents satisfy both rules and whose TASKS.md references only defined identifiers produces no duplicate-definition or unresolved-reference violations.
+    - repl check exits with code 1 when at least one of the new rules reports a violation and no execution error exists.
+    - make check passes.

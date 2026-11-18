@@ -513,3 +513,159 @@ func TestEvaluateDoesNotReportNoUnverifiedForOtherStates(t *testing.T) {
 		})
 	}
 }
+
+func TestEvaluateReportsDuplicateDefinitions(t *testing.T) {
+	facts := Facts{
+		ProductSpec:  fact.Present("- FR-001: first\n- FR-002: second\n- FR-001: again\n- AC-052: one\n- AC-052: two\n"),
+		Architecture: fact.Present("### C15. Skill Provider\n\nbody\n### C16. Other\n### C15. Duplicate\n"),
+	}
+
+	got := Evaluator{}.Evaluate(facts)
+
+	want := []Violation{
+		{Rule: RuleDuplicateDefinition, Path: productSpecPath, Message: "identifier AC-052 is defined on lines 4, 5"},
+		{Rule: RuleDuplicateDefinition, Path: productSpecPath, Message: "identifier FR-001 is defined on lines 1, 3"},
+		{Rule: RuleDuplicateDefinition, Path: architecturePath, Message: "identifier C15 is defined on lines 1, 5"},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("violations = %v, want %v", got, want)
+	}
+}
+
+func TestEvaluateIgnoresDefinitionsInsideFences(t *testing.T) {
+	facts := Facts{
+		ProductSpec:  fact.Present("- FR-001: one\n```\n- FR-001: fenced\n```\n- FR-001: two\n"),
+		Architecture: fact.Present("```\n### C15. Fenced\n```\n### C15. One\n### C15. Two\n"),
+	}
+
+	got := Evaluator{}.Evaluate(facts)
+
+	want := []Violation{
+		{Rule: RuleDuplicateDefinition, Path: productSpecPath, Message: "identifier FR-001 is defined on lines 1, 5"},
+		{Rule: RuleDuplicateDefinition, Path: architecturePath, Message: "identifier C15 is defined on lines 4, 5"},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("violations = %v, want %v", got, want)
+	}
+}
+
+func TestDuplicateDefinitionSkipsAbsentAndFailedDocuments(t *testing.T) {
+	facts := Facts{
+		ProductSpec:  fact.Absent[string](),
+		Architecture: fact.Failed[string](errors.New("permission denied")),
+	}
+
+	if got := (Evaluator{}).Evaluate(facts); len(got) != 0 {
+		t.Fatalf("violations = %v, want none", got)
+	}
+}
+
+func TestEvaluateReportsUnresolvedReferences(t *testing.T) {
+	facts := Facts{
+		TasksText:    fact.Present("- [ ] T-001 references FR-999 and C99 and AC-999\n- [ ] T-002 references AC-001\n"),
+		ProductSpec:  fact.Present("- AC-001: given\n"),
+		Architecture: fact.Present("### C1. Command Interface\n"),
+	}
+
+	got := Evaluator{}.Evaluate(facts)
+
+	want := []Violation{
+		{Rule: RuleUnresolvedReference, Path: tasksPath, Message: "identifier FR-999 is referenced but never defined (first appearance on line 1)"},
+		{Rule: RuleUnresolvedReference, Path: tasksPath, Message: "identifier C99 is referenced but never defined (first appearance on line 1)"},
+		{Rule: RuleUnresolvedReference, Path: tasksPath, Message: "identifier AC-999 is referenced but never defined (first appearance on line 1)"},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("violations = %v, want %v", got, want)
+	}
+}
+
+func TestUnresolvedReferenceIgnoresReferencesInsideFences(t *testing.T) {
+	facts := Facts{
+		TasksText:    fact.Present("- [ ] T-001 plain\n```\n- [x] T-002 FR-999\n```\n- [ ] T-003 C99\n"),
+		Architecture: fact.Present("### C1. Command Interface\n"),
+	}
+
+	got := Evaluator{}.Evaluate(facts)
+
+	if len(got) != 1 {
+		t.Fatalf("violations = %v, want exactly one", got)
+	}
+	if got[0].Message != "identifier C99 is referenced but never defined (first appearance on line 5)" {
+		t.Fatalf("message = %q", got[0].Message)
+	}
+}
+
+func TestUnresolvedReferenceReportsAnIdentifierOnlyOnce(t *testing.T) {
+	facts := Facts{
+		TasksText: fact.Present("- [ ] T-001 FR-999\n- [ ] T-002 FR-999\n"),
+	}
+
+	got := Evaluator{}.Evaluate(facts)
+
+	if len(got) != 1 {
+		t.Fatalf("violations = %v, want exactly one", got)
+	}
+	if got[0].Message != "identifier FR-999 is referenced but never defined (first appearance on line 1)" {
+		t.Fatalf("message = %q", got[0].Message)
+	}
+}
+
+func TestUnresolvedReferenceSkipsReferencesWhenDefiningDocumentIsAbsent(t *testing.T) {
+	facts := Facts{
+		TasksText:    fact.Present("- [ ] T-001 FR-999 C99\n"),
+		ProductSpec:  fact.Absent[string](),
+		Architecture: fact.Present("### C1. Command Interface\n"),
+	}
+
+	got := Evaluator{}.Evaluate(facts)
+
+	want := []Violation{
+		{Rule: RuleUnresolvedReference, Path: tasksPath, Message: "identifier C99 is referenced but never defined (first appearance on line 1)"},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("violations = %v, want %v", got, want)
+	}
+}
+
+func TestUnresolvedReferenceSkipsReferencesWhenDefiningDocumentIsFailed(t *testing.T) {
+	facts := Facts{
+		TasksText:   fact.Present("- [ ] T-001 FR-999 C99\n"),
+		ProductSpec: fact.Failed[string](errors.New("permission denied")),
+	}
+
+	got := Evaluator{}.Evaluate(facts)
+
+	want := []Violation{
+		{Rule: RuleUnresolvedReference, Path: tasksPath, Message: "identifier C99 is referenced but never defined (first appearance on line 1)"},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("violations = %v, want %v", got, want)
+	}
+}
+
+func TestUnresolvedReferenceRejectsIdentifiersAttachedToWords(t *testing.T) {
+	facts := Facts{
+		TasksText:    fact.Present("- [ ] T-001 XFR-999 A-C-1 C10abc\n"),
+		ProductSpec:  fact.Present("- FR-999: given\n"),
+		Architecture: fact.Present("### C10. Command Interface\n"),
+	}
+
+	if got := (Evaluator{}).Evaluate(facts); len(got) != 0 {
+		t.Fatalf("violations = %v, want none", got)
+	}
+}
+
+func TestUnresolvedReferenceWithAbsentTasksProducesNothing(t *testing.T) {
+	facts := Facts{
+		TasksText: fact.Absent[string](),
+	}
+
+	if got := (Evaluator{}).Evaluate(facts); len(got) != 0 {
+		t.Fatalf("violations = %v, want none", got)
+	}
+}
