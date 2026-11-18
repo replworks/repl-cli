@@ -21,6 +21,7 @@ func TestCommandsAreConfinedToTheProjectDirectory(t *testing.T) {
 	}{
 		{name: "init", args: []string{"init"}, changes: true},
 		{name: "status", args: []string{"status"}, documents: true},
+		{name: "show", args: []string{"show", "T-001"}, documents: true, wantCode: 1},
 		{name: "check", args: []string{"check"}, documents: true},
 		{name: "sync", args: []string{"sync"}, agents: "# stale\n", documents: true, changes: true},
 		{name: "unknown command", args: []string{"release"}, documents: true, wantCode: 2, wantStderr: "unknown command"},

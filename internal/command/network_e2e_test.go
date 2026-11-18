@@ -20,6 +20,7 @@ func TestCommandsRequestOnlyTheCanonicalSource(t *testing.T) {
 	}{
 		{name: "init", wantRequests: []string{canon.SourceURL, string(canon.AskHumanScript)}},
 		{name: "status", documents: true},
+		{name: "show", args: []string{"show", "T-001"}, documents: true},
 		{name: "check", documents: true, wantRequests: []string{canon.SourceURL}},
 		{name: "sync", agents: "# stale\n", documents: true, wantRequests: []string{canon.SourceURL, string(canon.AskHumanScript)}},
 		{name: "skills sync", args: []string{"skills", "sync"}, wantRequests: []string{
