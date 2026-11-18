@@ -63,6 +63,7 @@
 ## Outputs
 
 - Text lines printed by commands.
+- One JSON object printed by a command when EL-007 is given.
 - Exit code of each command.
 - AGENTS.md file and .replworks/ directory created by repl init.
 - `.replworks/scripts/ask-human.sh` created or replaced by init and sync.
@@ -130,6 +131,30 @@
   - Input: none.
   - Output: one line per skill, containing the skill name, the file path relative to the project directory, and whether the skill file was created, replaced, or is already up to date; one line per execution error.
   - Exit: 0 on completion, 2 on execution error.
+- EL-007: option --json of every command
+  - Purpose: print one JSON object instead of text lines.
+  - Input: none.
+  - Output: one JSON object whose fields are defined in User Interface / JSON Output; the encoding contains no ANSI escape sequences; the object occupies one line. The option has no effect on assistance output (usage help, completion, version information) or on ERR-005 handling.
+  - Exit: the same code the command would exit with text lines.
+
+### JSON Output
+
+Common rules:
+
+- When EL-007 is given, a command prints one JSON object instead of text lines.
+- The object occupies one line.
+- The object contains no ANSI escape sequences.
+- The `errors` field contains the same message text as the human-readable error lines, without the `repl: ` prefix, in the same order.
+- Unknown command or option handling (ERR-005) and assistance output are unchanged by EL-007.
+- The object contains only the fields defined below. Fields with no value are omitted unless a field's definition says otherwise.
+
+Objects per command:
+
+- repl status: `{"complete": <integer>, "total": <integer>, "first_incomplete": <string | null>, "errors": [<string>, ...]}`
+- repl check: `{"violations": [{"rule": <string>, "path": <string>, "message": <string>}, ...], "errors": [<string>, ...]}` — violations are in the fixed rule order and each message contains the rule-specific required content; errors are in gathering order.
+- repl init: `{"items": [{"path": <string>, "state": "created" | "skipped" | "replaced" | "deleted"}, ...], "errors": [<string>, ...]}` — items are in the processing order defined in ARCHITECTURE.md.
+- repl sync: `{"up_to_date": <boolean>, "diff": [{"kind": "added" | "removed", "line": <string>}, ...], "script": {"path": <string>, "state": "created" | "replaced"} | null, "errors": [<string>, ...]}` — `script` is null when the script step was not reached or its outcome is unknown; diff entries are in the same order as the human difference output.
+- repl skills sync: `{"items": [{"name": <string>, "path": <string>, "state": "created" | "replaced" | "up to date"}, ...], "errors": [<string>, ...]}` — items are in the fixed skill order.
 
 ### Rule Identifiers
 
@@ -216,6 +241,13 @@
 - FR-034: Only repl init, repl sync, and repl skills sync MUST write files.
 - FR-053: Every command other than repl skills sync MUST NOT create, modify, or delete anything under `.claude/`.
 - FR-054: repl skills sync MUST NOT create, modify, or delete anything under `.claude/` other than the five skill files and their parent directories.
+- FR-057: Every command MUST support the option --json. When given, a command MUST print one JSON object to stdout instead of text lines, MUST NOT emit ANSI escape sequences, and MUST exit with the same code it would exit with text lines. The object MUST contain only the fields defined in User Interface / JSON Output.
+- FR-058: When repl status is given --json, it MUST print {"complete": n, "total": m, "first_incomplete": "ID" | null, "errors": [...]}; first_incomplete is null when every task is complete; total may be 0.
+- FR-059: When repl check is given --json, it MUST print {"violations": [{"rule": ..., "path": ..., "message": ...}, ...], "errors": [...]}; violations in the fixed rule order and errors in gathering order.
+- FR-060: When repl init is given --json, it MUST print {"items": [{"path": ..., "state": "created" | "skipped" | "replaced" | "deleted"}, ...], "errors": [...]}; items in the processing order.
+- FR-061: When repl sync is given --json, it MUST print {"up_to_date": bool, "diff": [{"kind": "added" | "removed", "line": ...}, ...], "script": {"path": ..., "state": "created" | "replaced"} | null, "errors": [...]}; diff entries in the same order as the human difference output.
+- FR-062: When repl skills sync is given --json, it MUST print {"items": [{"name": ..., "path": ..., "state": "created" | "replaced" | "up to date"}, ...], "errors": [...]}; items in the fixed skill order.
+- FR-063: The option --json MUST NOT change the exit code of any command, and MUST NOT change assistance output or ERR-005 handling.
 
 ## User Flows
 
@@ -342,3 +374,11 @@
 - AC-062: Given an unreadable PRODUCT_SPEC.md, when repl check runs, then duplicate-definition and unresolved-reference do not report violations for that document, one execution error line is printed, and the exit code is 2. (FR-055, FR-056, FR-026, EL-003)
 - AC-063: Given no TASKS.md in the working tree, when repl check runs, then no line reports rule unresolved-reference. (FR-023, FR-056, EL-003)
 - AC-064: Given at least one duplicate-definition violation and no execution error, when repl check runs, then the exit code is 1. (FR-025, FR-055, EL-003)
+- AC-065: Given a TASKS.md with 5 tasks of which 2 are complete and one first incomplete task ID "T-003", when repl status --json runs, then stdout parses as JSON object {"complete": 2, "total": 5, "first_incomplete": "T-003"} and the exit code is 0. (EL-007, FR-058, EL-002)
+- AC-066: Given a project that violates rule documents-exist, when repl check --json runs, then stdout parses as {"violations": [{"rule": "documents-exist", "path": ".replworks/TASKS.md", "message": "document does not exist"}], "errors": []} in the fixed rule order and the exit code is 1. (EL-007, FR-059, EL-003)
+- AC-067: Given a project that violates no rule, when repl check --json runs, then stdout parses as {"violations": [], "errors": []} and the exit code is 0. (EL-007, FR-059, EL-003)
+- AC-068: Given an empty directory, when repl init --json runs, then stdout parses as {"items": [...]} with every created item reported with state "created", and the exit code is 0. (EL-007, FR-060, EL-001)
+- AC-069: Given identical skill files, when repl skills sync --json runs, then stdout parses as {"items": [...]} in which every item has state "up to date", and the exit code is 0. (EL-007, FR-062, EL-006)
+- AC-070: Given any command, when it is given --json, then the output contains no ANSI escape sequences. (EL-007, FR-057, FR-035)
+- AC-071: Given --json, when repl help or repl version runs, then the output is the same as without --json. (EL-007, FR-063)
+- AC-072: Given an AGENTS.md that differs from the expected AGENTS.md, when repl sync --json runs, then stdout parses as {"up_to_date": false, "diff": [...], "script": {"path": ".replworks/scripts/ask-human.sh", "state": "created" | "replaced"}} and the exit code is 0. (EL-007, FR-061, EL-005)

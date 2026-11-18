@@ -188,3 +188,80 @@ func mapsEqual(a, b map[string]string) bool {
 
 	return true
 }
+
+func TestSkillsSyncJSONReportsCreatedSkills(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	client, _ := serveSkills(t, nil)
+
+	code, stdout, stderr := runCommand(t, client, "--json", "skills", "sync")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty", stderr)
+	}
+
+	value := parseJSON(t, stdout)
+	items, ok := value["items"].([]any)
+	if !ok || len(items) != len(skill.Sources) {
+		t.Fatalf("items = %v, want the five skills", value["items"])
+	}
+	for i, item := range items {
+		info, ok := item.(map[string]any)
+		if !ok {
+			t.Fatalf("item %d = %v, want an object", i, item)
+		}
+		if info["name"] != skill.Sources[i].Name || info["path"] != skill.Sources[i].Path || info["state"] != "created" {
+			t.Fatalf("item %d = %v, want the created skill", i, info)
+		}
+	}
+	if errors, ok := value["errors"].([]any); !ok || len(errors) != 0 {
+		t.Fatalf("errors = %v, want empty array", value["errors"])
+	}
+}
+
+func TestSkillsSyncJSONReportsUpToDateSkills(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	client, _ := serveSkills(t, nil)
+
+	if code, _, stderr := runCommand(t, client, "skills", "sync"); code != 0 {
+		t.Fatalf("setup: exit code = %d (stderr = %q)", code, stderr)
+	}
+
+	code, stdout, _ := runCommand(t, client, "--json", "skills", "sync")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q)", code, stdout)
+	}
+
+	value := parseJSON(t, stdout)
+	for _, item := range value["items"].([]any) {
+		state := item.(map[string]any)["state"]
+		if state != "up to date" {
+			t.Fatalf("state = %v, want up to date", state)
+		}
+	}
+}
+
+func TestSkillsSyncJSONExitsTwoOnFetchFailure(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	client, _ := serveSkills(t, map[string]bool{"repl-auto-run": true})
+
+	code, stdout, _ := runCommand(t, client, "--json", "skills", "sync")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stdout = %q)", code, stdout)
+	}
+
+	value := parseJSON(t, stdout)
+	if errors, ok := value["errors"].([]any); !ok || len(errors) != 1 {
+		t.Fatalf("errors = %v, want one error", value["errors"])
+	}
+}

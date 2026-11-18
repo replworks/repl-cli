@@ -30,6 +30,10 @@ func (r *runner) newStatusCommand() *cobra.Command {
 }
 
 func renderStatus(cmd *cobra.Command, outcome status.Outcome) int {
+	if jsonRequested(cmd) {
+		return renderStatusJSON(cmd, outcome)
+	}
+
 	out := cmd.OutOrStdout()
 
 	if len(outcome.Errors) > 0 {

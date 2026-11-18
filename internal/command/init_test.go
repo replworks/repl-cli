@@ -661,3 +661,57 @@ func TestInitAndSyncPreserveHumanEditedDocuments(t *testing.T) {
 		}
 	}
 }
+
+func TestInitJSONInstallsTheDocuments(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	want := "# AGENTS.md\n"
+	client, _ := servePage(t, want)
+
+	code, stdout, stderr := runCommand(t, client, "--json", "init")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
+	}
+
+	value := parseJSON(t, stdout)
+	items, ok := value["items"].([]any)
+	if !ok || len(items) == 0 {
+		t.Fatalf("items = %v, want the created items", value["items"])
+	}
+	for _, item := range items {
+		state := item.(map[string]any)["state"]
+		if state != "created" {
+			t.Fatalf("item state = %v, want created", state)
+		}
+	}
+	if errors, ok := value["errors"].([]any); !ok || len(errors) != 0 {
+		t.Fatalf("errors = %v, want empty array", value["errors"])
+	}
+}
+
+func TestInitJSONExitsTwoWhenTheCanonicalSourceFails(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	failing := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}
+	server := httptest.NewServer(http.HandlerFunc(failing))
+	t.Cleanup(server.Close)
+
+	transport := &recordingTransport{target: server.URL}
+	redirect := &http.Client{Transport: transport}
+
+	code, stdout, _ := runCommand(t, redirect, "--json", "init")
+
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stdout = %q)", code, stdout)
+	}
+
+	value := parseJSON(t, stdout)
+	if errors, ok := value["errors"].([]any); !ok || len(errors) != 1 {
+		t.Fatalf("errors = %v, want one error", value["errors"])
+	}
+}

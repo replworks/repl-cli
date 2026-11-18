@@ -73,13 +73,13 @@ Task Ledger Reader, Unverified Mark Scanner, and Preserved Block Reader → Docu
   - Resolve the base branch name for check (the given value, otherwise the default defined in PRODUCT_SPEC.md).
   - Use the single canonical AGENTS.md source for init and sync without reading stdin.
   - Produce assistance output (usage help and similar) itself, without a coordinator.
-  - Render each Outcome into output lines.
+  - Render each Outcome into output lines, or into one compact JSON object when the command line carries the `--json` option (see User Interface / JSON Output in PRODUCT_SPEC.md).
   - Apply presentation colors to sync difference lines only when the output writer is a terminal.
   - Map each Outcome to an exit status.
 - Inputs: command-line arguments.
 - Outputs: output lines, exit status, one Request to one Coordinator.
 - Ownership boundaries:
-  - Owns all printed text, line layout, line order, and the exit status.
+  - Owns all printed text, line layout, line order, the JSON rendering, and the exit status.
   - Does not own violation content, error content, file access, network access, repository access, or parsing.
 
 ### C2. Init Coordinator
@@ -463,6 +463,7 @@ Request → Skills Sync Coordinator
 - sync: an up-to-date indication, or the difference lines, helper-script state line when changed, followed by any error line.
 - sync difference lines: removed lines are red and added lines are green for terminal output; non-terminal output is plain.
 - skills sync: one line per skill containing the skill name, the path, and created, replaced, or up to date; then any error lines.
+- When `--json` is given, the Command Interface renders the Outcome as one compact JSON object following the schema in User Interface / JSON Output in PRODUCT_SPEC.md instead of the lines above; the exit status mapping is unchanged.
 - All paths printed are relative to the Project Directory.
 
 ## 8. Architectural Rules
@@ -515,8 +516,8 @@ Request → Skills Sync Coordinator
 - No automatic repair of rule violations by check.
 - No resolution or ranking of conflicts between documents.
 - No interactive prompting during an invocation.
-- No pluggable output renderers or alternative output encodings.
 - No execution of installed skills, and no automatic discovery or installation of skills beyond the fixed five.
+- No output encoders other than the human text-lines renderer and the single compact JSON renderer.
 
 ## 11. Architectural Invariants
 

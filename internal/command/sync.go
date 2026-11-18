@@ -39,6 +39,10 @@ func (r *runner) newSyncCommand() *cobra.Command {
 }
 
 func renderSync(cmd *cobra.Command, outcome syncproject.Outcome) int {
+	if jsonRequested(cmd) {
+		return renderSyncJSON(cmd, outcome)
+	}
+
 	return renderSyncOutput(cmd, outcome, terminalOutput(cmd.OutOrStdout()))
 }
 

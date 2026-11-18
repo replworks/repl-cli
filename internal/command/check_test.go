@@ -1256,3 +1256,59 @@ func TestCheckDoesNotReportCrossReferenceRulesWhenADocumentIsUnreadable(t *testi
 		t.Fatalf("stdout = %q, want no cross-reference violation lines", stdout)
 	}
 }
+
+func TestCheckJSONExitsOneWithViolations(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	writeTasks(t, dir, "- [ ] T-001 first\n- [x] T-002 second\n- [ ] T-003 third\n")
+	initRepository(t, dir)
+	writeTasks(t, dir, "- [x] T-001 first\n- [x] T-002 second\n- [x] T-003 third\n")
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "--json", "check")
+
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1 (stdout = %q, stderr = %q)", code, stdout, stderr)
+	}
+
+	value := parseJSON(t, stdout)
+	violations, ok := value["violations"].([]any)
+	if !ok || len(violations) != 1 {
+		t.Fatalf("violations = %v, want one violation", value["violations"])
+	}
+	violation, ok := violations[0].(map[string]any)
+	if !ok {
+		t.Fatalf("violation = %v, want an object", violations[0])
+	}
+	if violation["rule"] != "single-task-completion" {
+		t.Fatalf("rule = %v, want single-task-completion", violation["rule"])
+	}
+	if errors, ok := value["errors"].([]any); !ok || len(errors) != 0 {
+		t.Fatalf("errors = %v, want empty array", value["errors"])
+	}
+}
+
+func TestCheckJSONExitsZeroWithoutViolations(t *testing.T) {
+	dir := t.TempDir()
+	writeDocuments(t, dir, recordedText(t))
+	initRepository(t, dir)
+	t.Chdir(dir)
+
+	client, _ := servePage(t, string(recordedPage(t)))
+
+	code, stdout, stderr := runCommand(t, client, "--json", "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stdout = %q, stderr = %q)", code, stdout, stderr)
+	}
+
+	value := parseJSON(t, stdout)
+	for _, key := range []string{"violations", "errors"} {
+		items, ok := value[key].([]any)
+		if !ok || len(items) != 0 {
+			t.Fatalf("%s = %v, want empty array", key, value[key])
+		}
+	}
+}

@@ -93,6 +93,8 @@ func (r *runner) newRootCommand() *cobra.Command {
 	if r.app.Stdin != nil {
 		root.SetIn(r.app.Stdin)
 	}
+	root.PersistentFlags().Bool("json", false, "print one JSON object instead of text lines")
+
 	root.AddCommand(r.newStatusCommand())
 	root.AddCommand(r.newInitCommand())
 	root.AddCommand(r.newSyncCommand())

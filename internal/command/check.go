@@ -44,6 +44,10 @@ func (r *runner) newCheckCommand() *cobra.Command {
 }
 
 func renderCheck(cmd *cobra.Command, outcome checkproject.Outcome) int {
+	if jsonRequested(cmd) {
+		return renderCheckJSON(cmd, outcome)
+	}
+
 	out := cmd.OutOrStdout()
 
 	for _, violation := range outcome.Violations {

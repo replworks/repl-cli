@@ -35,6 +35,10 @@ func (r *runner) newInitCommand() *cobra.Command {
 }
 
 func renderInit(cmd *cobra.Command, outcome initproject.Outcome) int {
+	if jsonRequested(cmd) {
+		return renderInitJSON(cmd, outcome)
+	}
+
 	out := cmd.OutOrStdout()
 
 	for _, item := range outcome.Items {

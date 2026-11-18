@@ -51,6 +51,10 @@ func (r *runner) newSkillsSyncCommand() *cobra.Command {
 }
 
 func renderSkillsSync(cmd *cobra.Command, outcome skillsproject.Outcome) int {
+	if jsonRequested(cmd) {
+		return renderSkillsSyncJSON(cmd, outcome)
+	}
+
 	out := cmd.OutOrStdout()
 
 	for _, item := range outcome.Items {
