@@ -1,0 +1,226 @@
+---
+name: repl-tasks
+description: "Generate TASKS.md decomposing implementation into ordered, verifiable tasks. Use when the user asks to create TASKS.md or decompose work. (TASKS.md 작성을 요청받으면 사용)"
+---
+
+Generate TASKS.md.
+
+Follow AGENTS.md.
+
+Assume PRODUCT_SPEC.md, TECH_STACK.md, and ARCHITECTURE.md
+already exist and are correct.
+
+Stop and report instead of generating TASKS.md only if:
+
+- the documents conflict and the conflict cannot be resolved by the priority rules in AGENTS.md
+- PRODUCT_SPEC.md contains unresolved product-scope ambiguity or contradiction
+- a required behavior is undefined in PRODUCT_SPEC.md and cannot be derived
+  without inventing product behavior
+
+Do NOT stop merely because any document contains [UNVERIFIED].
+
+The purpose of TASKS.md is to define:
+
+What should be implemented next, in dependency order.
+
+TASKS.md is an execution checklist for AI implementation,
+not project management.
+
+Do not include estimates, owners, dates, or priorities.
+Do not create any other document.
+
+Do not describe architecture.
+Do not describe technologies.
+Do not describe tech stacks.
+Do not describe implementation details.
+Do not reference specific classes.
+Do not reference specific files.
+Do not reference specific libraries.
+
+You may reference documents, document sections,
+and component names defined in ARCHITECTURE.md.
+Do not restate their content.
+
+## Scope rules
+
+PRODUCT_SPEC.md defines the complete current build scope.
+
+Do not require PRODUCT_SPEC.md to distinguish MVP from Future.
+Do not invent an MVP/Future classification.
+
+Every buildable requirement stated in PRODUCT_SPEC.md is in the current scope.
+Features excluded by PRODUCT_SPEC.md MUST NOT appear as tasks.
+
+Do not create tasks for anything PRODUCT_SPEC.md does not state.
+
+## Task rules
+
+Every task must satisfy at least one requirement in PRODUCT_SPEC.md,
+except an external-boundary verification task explicitly created
+to resolve [UNVERIFIED] behavior required by a PRODUCT_SPEC.md requirement.
+
+Every requirement in PRODUCT_SPEC.md that requires implementation
+must be satisfied by at least one task.
+
+TASKS.md contains only tasks whose acceptance criteria can be verified
+by an automated test or an observable behavior.
+
+Do not create tasks for content or visual design:
+wording, copy, translations, images, styling, layout polish, colors.
+These are human-owned and judged by a human
+(see HUMAN_OWNED_CHANGES in AGENTS.md).
+
+If PRODUCT_SPEC.md requires a content slot to exist,
+the task verifies that the slot renders provided content,
+not what the content says.
+
+Each implementation task must be a vertical slice:
+an observable, testable behavior from user-visible input to output.
+
+Do not create layer-only implementation tasks.
+
+External-boundary verification tasks are an exception to the
+user-visible vertical-slice rule.
+Their purpose is to establish observed behavior at an external boundary
+before dependent implementation work is performed.
+
+Each task must be completable by one AI in one session,
+assuming all earlier tasks are complete.
+
+AGENTS.md requires stopping after each task.
+
+## Task ordering
+
+Order tasks by dependency.
+
+The first task is the project foundation.
+
+Its acceptance criteria:
+the constraints in TECH_STACK.md are satisfied
+and the checks defined there pass.
+
+Do not restate TECH_STACK.md.
+
+If a PRODUCT_SPEC.md requirement depends on an external system
+whose behavior is marked [UNVERIFIED], create one or more
+prerequisite verification tasks before creating implementation tasks
+that depend on that behavior.
+
+Do not infer, assume, or invent the unverified behavior.
+
+An external-boundary verification task MUST:
+
+- identify the external boundary by reference to the relevant document section
+- record the observed live behavior needed by dependent tasks
+- include an executable test or probe against the live boundary
+- define the observed result in pass/fail terms
+
+After the required behavior has been verified,
+dependent implementation tasks may rely on that recorded observation.
+
+Do not create speculative implementation tasks for behavior
+that has not been verified.
+
+## External boundaries
+
+If a task touches an external boundary as defined in AGENTS.md,
+mark it.
+
+For an external-boundary implementation task,
+its acceptance criteria MUST include:
+
+- the required live behavior is observed at the boundary
+- an E2E test exercises the product through the live boundary
+- the observed success behavior passes
+- the failure behavior defined by ARCHITECTURE.md passes
+
+For an external-boundary verification task,
+its acceptance criteria MUST include
+a recorded live observation and an executable probe or E2E check
+against the live boundary.
+
+Do not replace live-boundary verification with mocked behavior.
+
+Mocks may be used in addition to live verification,
+but a mock does not satisfy the external-boundary verification requirement.
+
+## Acceptance criteria rules
+
+Each task has its own acceptance criteria.
+
+Each criterion must be pass/fail verifiable
+by an automated test or an observable behavior.
+
+Acceptance criteria MUST:
+
+- reference the behavior required by the task
+- include applicable failure behavior defined in ARCHITECTURE.md
+- include unit tests passing where unit tests apply
+- avoid subjective wording
+
+A task is complete only when all its acceptance criteria are satisfied.
+
+## Existing code
+
+If the repository contains source code:
+
+Still generate the full task list.
+Never remove a task because it appears implemented.
+
+Mark a task [X] only if you have verified every one of its
+acceptance criteria by actually running the tests
+or observing the behavior.
+
+Code that appears to implement a task is not verification.
+
+If any criterion cannot be verified, leave the task [ ].
+
+An external-boundary implementation task may be marked [X] only
+after its required live E2E test has passed.
+
+An external-boundary verification task may be marked [X] only
+after its required live observation and executable probe or E2E check
+have passed.
+
+If the repository has no source code, all implementation tasks are [ ].
+
+## Execution model
+
+TASKS.md is generated from the current contents of:
+
+- PRODUCT_SPEC.md
+- TECH_STACK.md
+- ARCHITECTURE.md
+- AGENTS.md
+
+Do not use Git history to infer product requirements,
+scope, acceptance criteria, or external behavior.
+
+Do not infer missing requirements from existing code.
+
+Do not infer missing external behavior from documentation alone
+when the relevant section is marked [UNVERIFIED].
+
+Generate TASKS.md only once.
+After this, tasks are changed only as defined in AGENTS.md.
+
+## Structure
+
+Organize tasks in dependency order.
+
+Do not create MVP/Future phases unless PRODUCT_SPEC.md itself explicitly
+defines such phases.
+
+Use this format for every task:
+
+- [ ] T-001 <capability>
+  - Satisfies: <PRODUCT_SPEC.md section>
+  - External boundary: yes | no
+  - Acceptance criteria:
+    - <criterion>
+
+For an external-boundary verification task,
+use the same format and identify the referenced PRODUCT_SPEC.md section
+whose required behavior is being verified.
+
+Optimize for autonomous execution by AI systems.
