@@ -1,0 +1,86 @@
+---
+name: repl-tech-stack
+description: "Generate TECH_STACK.md defining languages, libraries, and implementation constraints. Use when the user asks to create or update TECH_STACK.md. (TECH_STACK.md 작성을 요청받으면 사용)"
+---
+
+Generate TECH_STACK.md in two phases.
+
+INPUTS
+- PRODUCT_SPEC.md: correct and final. Source of product requirements.
+- TECH_DECISIONS: correct and final. Highest-priority source of technology names and versions.
+- ARCHITECTURE.md does not exist yet. It will be written AFTER this document, using it as input.
+
+SOURCE RULES
+- Final TECH_STACK.md MUST contain only technologies from: (a) TECH_DECISIONS, (b) proposals approved by the user in Phase 1.
+- MUST NOT put an unapproved technology in TECH_STACK.md.
+- MUST NOT contradict TECH_DECISIONS. If a proposal would conflict with it, drop the proposal.
+- MUST NOT restate product behavior from PRODUCT_SPEC.
+- If TECH_DECISIONS conflicts with PRODUCT_SPEC, stop and list the conflicts. Nothing else.
+
+LANGUAGE RULES
+- Phase 1 output: write in the user's language.
+- Conflict lists (SOURCE RULES, Phase 2 edit conflicts): write in the user's language.
+- Phase 2 output (TECH_STACK.md): write in English, regardless of the user's language.
+
+PHASE 1: GAP FILL AND PROPOSAL
+
+Step 1. Determine project type from PRODUCT_SPEC and TECH_DECISIONS.
+Examples: web service, web app, CLI tool, library/package, desktop app, mobile app, game, batch/data pipeline, browser extension, other.
+If the type is unclear, include it as a BLOCKED question.
+
+Step 2. Derive the decision categories this project type needs.
+- Always required: runtime/platform + version; language + build/run method; package/dependency manager + lockfile (if the ecosystem has one); test tool; linter; formatter; CI system; distribution/release method and target; license.
+- Coverage, only if the project uses coverage: coverage tool + threshold.
+- Configuration, only if the project is configurable: config format, setting/env var names, secret storage.
+- Type-specific categories: derive them from the project type and the capabilities PRODUCT_SPEC requires (e.g. entry-point framework, argument parsing, persistence, networking/HTTP client, external service clients, auth, background work, UI toolkit, rendering/graphics, packaging/installer, update mechanism).
+- Use PRODUCT_SPEC only to decide whether a category applies, never to choose a technology.
+- MUST NOT ask about a category the project type does not need.
+
+Step 3. For every category not defined in TECH_DECISIONS, decide it yourself and propose a value. Do NOT ask open questions for gaps you can fill.
+- If TECH_DECISIONS does not say whether coverage is used, propose it as a CHOICE (alt: no coverage).
+
+Classify each proposal:
+- OBVIOUS: mandated or defaulted by an already-decided runtime, framework, or tool (e.g. its official package manager, lockfile, config format, test runner, linter). Decide it. Do not ask.
+- CHOICE: real alternatives exist. Pick one recommended option, name the one main alternative, give a one-line reason.
+- BLOCKED: no defensible default without information only the user has (e.g. release target, license intent, project type). Ask one question, with your best guess attached.
+
+Versions: propose a version constraint matching the ecosystem's syntax. Mark any version you are not certain is current with "(verify)".
+
+Phase 1 output rules:
+- Add a one-line plain description for every tool.
+- Keep the final line verbatim in English (do not translate it).
+
+Phase 1 output format (and NOTHING else):
+
+1. Project type: one line.
+2. OBVIOUS list: one line each — item: value.
+3. CHOICE list: one line each — item: recommended (alt: X) — reason.
+4. BLOCKED list: numbered questions, each with a best-guess default.
+5. Final line: "Reply `approve all`, or list changes by item."
+
+Do NOT output TECH_STACK.md in Phase 1.
+If there are no gaps, skip Phase 1 and go to Phase 2.
+
+PHASE 2: GENERATE
+Run after the user approves or edits the Phase 1 list. Treat the approved list as part of TECH_DECISIONS. Do NOT re-ask approved items. If the user's edits create a conflict, list the conflict and stop.
+
+SCOPE BOUNDARY
+- Cover only technology choices and the rules that follow from them.
+- MUST NOT define components, layers, modules, boundaries, data flow, responsibilities, or system structure.
+- MUST NOT define directory layout beyond paths mandated by the chosen framework or tooling.
+- MUST NOT include process rules (change control), product non-goals, or architectural invariants.
+- State each rule once. MUST NOT repeat a rule across sections.
+
+OUTPUT FORMAT (Phase 2)
+- Language: English only.
+- Exactly these 8 sections, in this order, numbered headings, no other sections:
+  1. Languages / runtimes / frameworks / libraries (name + version constraint)
+  2. Framework- or tool-mandated paths and file names only
+  3. Coding conventions specific to the chosen stack
+  4. Testing rules (tools, naming; required coverage only if coverage is used)
+  5. Configuration rules (settings, config files, secrets handling; write "None" if not configurable)
+  6. Build, packaging, and release rules (targets, build, distribution steps)
+  7. Security rules tied to the chosen stack
+  8. Non-goals (technologies and tools explicitly excluded)
+- Flat terse bullets. "MUST / MUST NOT" phrasing. No prose, no explanations, no "why".
+- Audience: AI implementer.
