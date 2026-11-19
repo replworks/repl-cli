@@ -26,7 +26,35 @@ repl status        # report task progress from .replworks/TASKS.md
 repl check         # verify the project against the project rules
 repl sync          # replace AGENTS.md with the canonical AGENTS.md
 repl skills sync   # install or update the five Agent Skills in .claude/skills/
+repl next          # print the next task and the definitions it references
+repl show FR-001   # print the definitions of the given identifiers
 ```
+
+Every command accepts `--json` and then prints one JSON object instead of text
+lines.
+
+## Reading only what a task needs
+
+`repl next` and `repl show` let an AI agent read only the parts of the
+authoritative documents that a task needs, instead of the whole documents.
+
+- `repl next` prints the first incomplete task in `.replworks/TASKS.md`, then
+  the definition of each identifier the task references, including every
+  identifier in a range such as `AC-010 through AC-014`. Identifiers that have
+  no definition are listed at the end.
+- `repl show <identifier>...` prints the definitions of the given identifiers
+  in the given order. It exits with 1 when an identifier has no definition.
+
+Identifiers: `T-001` (task), `FR-001`, `EL-001`, `ERR-001`, `AC-001` (from
+PRODUCT_SPEC.md), `C1` (component) and `AR-01` (architectural rule) (from
+ARCHITECTURE.md).
+
+```sh
+repl next --json
+repl show C4 AR-05 --json
+```
+
+Both commands only read files and send no network request.
 
 ## Agent Skills
 
