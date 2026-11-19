@@ -184,10 +184,15 @@ If none is named, use the first unchecked task in TASKS.md, from top to bottom.
 
 For every task:
 
-1. Read PRODUCT_SPEC.md
-2. Read TECH_STACK.md
-3. Read ARCHITECTURE.md
-4. Read task definition
+1. Read TECH_STACK.md in full.
+2. Read the task definition and the definitions it references.
+   With `repl` installed: run `repl next --json`, or `repl show <task ID> --json` for a task named by the human.
+   Without `repl`: read the task definition in TASKS.md.
+3. Read PRODUCT_SPEC.md and ARCHITECTURE.md.
+   With `repl` installed: read only the parts the task needs: the definitions from step 2,
+   `repl show <identifier>... --json` for any other identifier, and each section the task names without an identifier.
+   Without `repl`: read both in full.
+4. Read the whole document whenever the parts you read leave a requirement, a constraint, or a conflict unclear.
 5. If the task touches a domain that is not covered by verified knowledge in PRODUCT_SPEC.md, TECH_STACK.md, or ARCHITECTURE.md: stop. Mark the relevant section UNVERIFIED (see UNVERIFIED_MARK). Do not implement against an UNVERIFIED section. Require explicit human confirmation before continuing.
 6. Implement
 7. Write unit tests for internal logic
